@@ -17,11 +17,11 @@ static const char *TAG = "main";
 static void status_led_init(void)
 {
     gpio_config_t io_conf = {
-        .intr_type = GPIO_INTR_DISABLE,
-        .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = (1ULL << CONFIG_STATUS_LED_GPIO),
-        .pull_down_en = 0,
-        .pull_up_en = 0,
+        .intr_type      = GPIO_INTR_DISABLE,
+        .mode           = GPIO_MODE_OUTPUT,
+        .pin_bit_mask   = (1ULL << CONFIG_STATUS_LED_GPIO),
+        .pull_down_en   = 0,
+        .pull_up_en     = 0,
     };
     gpio_config(&io_conf);
     gpio_set_level(CONFIG_STATUS_LED_GPIO, 0);
@@ -34,7 +34,7 @@ static void status_led_set(bool on)
 }
 
 static volatile int current_led_pattern = 0;
-static TaskHandle_t led_task_handle = NULL;
+static TaskHandle_t led_task_handle     = NULL;
 
 // Status LED 
 static void status_led_blink_task(void *pvParameters)
@@ -43,7 +43,7 @@ static void status_led_blink_task(void *pvParameters)
     
     while (1) {
         
-        int pattern = current_led_pattern;
+        int pattern     = current_led_pattern;
         
         switch (pattern) {
             case 0: // Solid off - disconnected
@@ -180,7 +180,7 @@ static void heartbeat_task(void *pvParameters)
             relay_state_t current_state = relay_control_get_state();
             mqtt_publish_relay_state(current_state);
             
-            const char *state_str = (current_state == RELAY_STATE_ON) ? "on" : "off";
+            const char *state_str       = (current_state == RELAY_STATE_ON) ? "on" : "off";
             ESP_LOGI(TAG, "Heartbeat sent - Status: online, Relay: %s", state_str);
         }
         
@@ -311,12 +311,12 @@ void app_main(void)
     
     if (wifi_err == ESP_OK) {
         ESP_LOGI(TAG, "Starting WiFi connection...");
-        esp_err_t wifi_start_err = wifi_manager_start();
+        esp_err_t wifi_start_err    = wifi_manager_start();
         if (wifi_start_err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(wifi_start_err));
         } else {
             ESP_LOGI(TAG, "WiFi connection started, waiting for result...");
-            esp_err_t wait_result = wifi_manager_wait_for_connection(30000);
+            esp_err_t wait_result   = wifi_manager_wait_for_connection(30000);
             if (wait_result == ESP_OK) {
                 ESP_LOGI(TAG, "WiFi connected successfully");
             } else if (wait_result == ESP_ERR_TIMEOUT) {
