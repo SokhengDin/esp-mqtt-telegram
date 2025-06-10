@@ -16,12 +16,13 @@ COPY .env* ./
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
 
 COPY . .
 
-RUN useradd --create-home --shell /bin/bash app \
-    && chown -R app:app /app
-USER app
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 
