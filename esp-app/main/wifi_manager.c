@@ -12,7 +12,7 @@
 static const char *TAG = "wifi_manager";
 
 /* FreeRTOS event group to signal when we are connected*/
-static EventGroupHandle_t s_wifi_event_group;
+static EventGroupHandle_t s_wifi_event_group = NULL;
 
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
@@ -23,6 +23,7 @@ static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num = 0;
 static wifi_state_t s_wifi_state = WIFI_STATE_DISCONNECTED;
 static wifi_event_callback_t s_event_callback = NULL;
+static bool s_wifi_initialized = false;
 
 static void wifi_state_changed(wifi_state_t new_state)
 {
@@ -46,23 +47,39 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "Retry to connect to the AP (%d/%d)", s_retry_num, CONFIG_ESP_MAXIMUM_RETRY);
             wifi_state_changed(WIFI_STATE_CONNECTING);
         } else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+            if (s_wifi_event_group != NULL) {
+                xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+            }
             ESP_LOGI(TAG, "Connect to the AP fail");
             wifi_state_changed(WIFI_STATE_FAILED);
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+        if (event) {
+            ESP_LOGI(TAG, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+        }
         s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        if (s_wifi_event_group != NULL) {
+            xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        }
         wifi_state_changed(WIFI_STATE_CONNECTED);
     }
 }
 
 esp_err_t wifi_manager_init(wifi_event_callback_t callback)
 {
+    if (s_wifi_initialized) {
+        ESP_LOGW(TAG, "WiFi manager already initialized");
+        return ESP_OK;
+    }
+    
     s_event_callback = callback;
     s_wifi_event_group = xEventGroupCreate();
+    
+    if (s_wifi_event_group == NULL) {
+        ESP_LOGE(TAG, "Failed to create WiFi event group");
+        return ESP_FAIL;
+    }
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -98,12 +115,23 @@ esp_err_t wifi_manager_init(wifi_event_callback_t callback)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
 
+    s_wifi_initialized = true;
     ESP_LOGI(TAG, "WiFi manager initialized");
     return ESP_OK;
 }
 
 esp_err_t wifi_manager_start(void)
 {
+    if (!s_wifi_initialized) {
+        ESP_LOGE(TAG, "WiFi manager not initialized");
+        return ESP_FAIL;
+    }
+    
+    if (s_wifi_event_group == NULL) {
+        ESP_LOGE(TAG, "WiFi event group not created");
+        return ESP_FAIL;
+    }
+    
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "WiFi init finished.");

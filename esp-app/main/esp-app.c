@@ -33,13 +33,20 @@ static void status_led_set(bool on)
     gpio_set_level(CONFIG_STATUS_LED_GPIO, on ? 1 : 0);
 }
 
+// Make the LED pattern variable static to avoid race conditions
+static volatile int current_led_pattern = 0;
+static TaskHandle_t led_task_handle = NULL;
+
 // Status LED blink patterns
 static void status_led_blink_task(void *pvParameters)
 {
-    int blink_pattern = *(int*)pvParameters;
+    ESP_LOGI(TAG, "Status LED task started");
     
     while (1) {
-        switch (blink_pattern) {
+        // Read the current pattern safely
+        int pattern = current_led_pattern;
+        
+        switch (pattern) {
             case 0: // Solid off - disconnected
                 status_led_set(false);
                 vTaskDelay(pdMS_TO_TICKS(1000));
@@ -71,14 +78,26 @@ static void status_led_blink_task(void *pvParameters)
     }
 }
 
-static int current_led_pattern = 0;
-static TaskHandle_t led_task_handle = NULL;
-
 static void update_status_led(int pattern)
 {
     current_led_pattern = pattern;
     if (led_task_handle == NULL) {
-        xTaskCreate(status_led_blink_task, "status_led", 2048, &current_led_pattern, 5, &led_task_handle);
+        // Increased stack size from 2048 to 4096 to prevent stack overflow
+        BaseType_t result = xTaskCreate(
+            status_led_blink_task, 
+            "status_led", 
+            4096,  // Increased stack size
+            NULL,  // No parameter needed now
+            5, 
+            &led_task_handle
+        );
+        
+        if (result != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create status LED task");
+            led_task_handle = NULL;
+        } else {
+            ESP_LOGI(TAG, "Status LED task created successfully");
+        }
     }
 }
 
@@ -141,6 +160,8 @@ void status_led_set_mqtt_state(mqtt_state_t state)
 
 static void heartbeat_task(void *pvParameters)
 {
+    ESP_LOGI(TAG, "Heartbeat task started");
+    
     while (1) {
         if (mqtt_client_get_state() == MQTT_STATE_CONNECTED) {
             // Send heartbeat status
@@ -192,8 +213,21 @@ void app_main(void)
     
     ESP_LOGI(TAG, "Starting WiFi connection...");
     
-    // Create heartbeat task (it will wait for connections)
-    xTaskCreate(heartbeat_task, "heartbeat", 4096, NULL, 5, NULL);
+    // Create heartbeat task with increased stack size
+    BaseType_t heartbeat_result = xTaskCreate(
+        heartbeat_task, 
+        "heartbeat", 
+        6144,  // Increased from 4096 to 6144
+        NULL, 
+        5, 
+        NULL
+    );
+    
+    if (heartbeat_result != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create heartbeat task");
+    } else {
+        ESP_LOGI(TAG, "Heartbeat task created successfully");
+    }
     
     ESP_LOGI(TAG, "ESP32 Device Controller initialized successfully");
     ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
@@ -204,7 +238,12 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(wifi_err));
     }
     
+    // Add small delay to allow tasks to initialize
+    vTaskDelay(pdMS_TO_TICKS(100));
+    
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        // Print available heap memory periodically for debugging
+        ESP_LOGI(TAG, "Free heap size: %lu bytes", esp_get_free_heap_size());
+        vTaskDelay(pdMS_TO_TICKS(10000)); // Every 10 seconds
     }
 }

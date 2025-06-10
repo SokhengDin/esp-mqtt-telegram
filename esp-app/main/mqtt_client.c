@@ -26,21 +26,37 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     esp_mqtt_client_handle_t client = event->client;
     int msg_id;
     
+    // Add null checks for safety
+    if (!event || !client) {
+        ESP_LOGE(TAG, "Invalid event or client handle");
+        return;
+    }
+    
     switch ((esp_mqtt_event_id_t)event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
             s_mqtt_state = MQTT_STATE_CONNECTED;
             status_led_set_mqtt_state(s_mqtt_state);
             
-            // Subscribe to relay control topic
+            // Subscribe to relay control topic with safety check
             char subscribe_topic[64];
-            snprintf(subscribe_topic, sizeof(subscribe_topic), "%s/relay/set", CONFIG_DEVICE_ID);
+            int ret = snprintf(subscribe_topic, sizeof(subscribe_topic), "%s/relay/set", CONFIG_DEVICE_ID);
+            if (ret >= sizeof(subscribe_topic)) {
+                ESP_LOGE(TAG, "Subscribe topic truncated");
+                break;
+            }
+            
             msg_id = esp_mqtt_client_subscribe(client, subscribe_topic, 0);
             ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d to topic: %s", msg_id, subscribe_topic);
             
-            // Publish online status
+            // Publish online status with safety check
             char status_topic[64];
-            snprintf(status_topic, sizeof(status_topic), "%s/status", CONFIG_DEVICE_ID);
+            ret = snprintf(status_topic, sizeof(status_topic), "%s/status", CONFIG_DEVICE_ID);
+            if (ret >= sizeof(status_topic)) {
+                ESP_LOGE(TAG, "Status topic truncated");
+                break;
+            }
+            
             msg_id = esp_mqtt_client_publish(client, status_topic, "online", 0, 1, 1);
             ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
             break;
@@ -61,37 +77,59 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-            if (event->topic && event->data) {
-                printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-                printf("DATA=%.*s\r\n", event->data_len, event->data);
+            
+            // Add comprehensive safety checks
+            if (!event->topic || !event->data || event->topic_len <= 0 || event->data_len <= 0) {
+                ESP_LOGW(TAG, "Invalid MQTT data received");
+                break;
+            }
+            
+            // Limit topic and data length to prevent overflow
+            if (event->topic_len > 128 || event->data_len > 32) {
+                ESP_LOGW(TAG, "MQTT message too long, ignoring");
+                break;
+            }
+
+            char topic_str[129] = {0};  // +1 for null terminator
+            char data_str[33] = {0};    // +1 for null terminator
+            
+            memcpy(topic_str, event->topic, event->topic_len);
+            memcpy(data_str, event->data, event->data_len);
+            
+            ESP_LOGI(TAG, "TOPIC=%s", topic_str);
+            ESP_LOGI(TAG, "DATA=%s", data_str);
+            
+
+            char expected_topic[64];
+            int expected_ret = snprintf(expected_topic, sizeof(expected_topic), "%s/relay/set", CONFIG_DEVICE_ID);
+            if (expected_ret >= sizeof(expected_topic)) {
+                ESP_LOGE(TAG, "Expected topic truncated");
+                break;
+            }
+            
+            if (strcmp(topic_str, expected_topic) == 0) {
+                bool turn_on = (strcmp(data_str, "on") == 0);
+                bool turn_off = (strcmp(data_str, "off") == 0);
                 
-                // Process received message - check if this is relay control
-                char expected_topic[64];
-                snprintf(expected_topic, sizeof(expected_topic), "%s/relay/set", CONFIG_DEVICE_ID);
-                
-                if (event->topic_len > 0 && event->data_len > 0 && 
-                    strlen(expected_topic) == event->topic_len &&
-                    strncmp(event->topic, expected_topic, event->topic_len) == 0) {
+                if (turn_on || turn_off) {
+                    relay_state_t new_state = turn_on ? RELAY_STATE_ON : RELAY_STATE_OFF;
                     
-                    bool turn_on = (event->data_len == 2 && strncmp(event->data, "on", 2) == 0);
-                    bool turn_off = (event->data_len == 3 && strncmp(event->data, "off", 3) == 0);
-                    
-                    if (turn_on || turn_off) {
-                        relay_state_t new_state = turn_on ? RELAY_STATE_ON : RELAY_STATE_OFF;
-                        
-                        if (relay_control_get_state() != new_state) {
-                            esp_err_t result = relay_control_set_state(new_state);
-                            if (result == ESP_OK) {
-                                const char *payload = turn_on ? "on" : "off";
-                                ESP_LOGI(TAG, "Relay state changed to: %s", payload);
-                                
-                                // Publish confirmation
-                                char state_topic[64];
-                                snprintf(state_topic, sizeof(state_topic), "%s/relay/state", CONFIG_DEVICE_ID);
+                    if (relay_control_get_state() != new_state) {
+                        esp_err_t result = relay_control_set_state(new_state);
+                        if (result == ESP_OK) {
+                            const char *payload = turn_on ? "on" : "off";
+                            ESP_LOGI(TAG, "Relay state changed to: %s", payload);
+                            
+                            // Publish confirmation with safety check
+                            char state_topic[64];
+                            int state_ret = snprintf(state_topic, sizeof(state_topic), "%s/relay/state", CONFIG_DEVICE_ID);
+                            if (state_ret < sizeof(state_topic)) {
                                 esp_mqtt_client_publish(client, state_topic, payload, 0, 1, 0);
                             }
                         }
                     }
+                } else {
+                    ESP_LOGW(TAG, "Invalid relay command: %s", data_str);
                 }
             }
             break;
