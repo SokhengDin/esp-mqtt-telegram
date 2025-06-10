@@ -34,7 +34,7 @@ An IoT solution with FastAPI-based MQTT controller and ESP32 firmware for remote
 pip install -r requirements.txt
 
 # Configure environment
-cp environment_template.env .env
+cp .env.example .env
 # Edit .env with your settings
 
 # Run the application
@@ -81,7 +81,7 @@ TELEGRAM_ALLOWED_USERS  = 123456789,987654321
 
 # Configuration
 CONFIG_FILE_PATH        = esp_config.json
-LOG_LEVEL              = INFO
+LOG_LEVEL               = INFO
 ```
 
 ### 🔧 ESP32 Firmware Configuration
@@ -225,7 +225,7 @@ Topic: esp-device-1/relay/state
 Payload: "on" | "off"
 ```
 
-### Enhanced MQTT Features
+### MQTT Features
 - **QoS 1 Support**: Reliable relay command delivery
 - **Dual Topic Handling**: Separate status and relay feedback
 - **Connection Tracking**: Real-time MQTT connection status
