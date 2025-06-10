@@ -133,29 +133,9 @@ esp_err_t wifi_manager_start(void)
     }
     
     ESP_ERROR_CHECK(esp_wifi_start());
-
-    ESP_LOGI(TAG, "WiFi init finished.");
-
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
-
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
-     * happened. */
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "Connected to AP SSID:%s", CONFIG_ESP_WIFI_SSID);
-        return ESP_OK;
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s", CONFIG_ESP_WIFI_SSID);
-        return ESP_FAIL;
-    } else {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
-        return ESP_FAIL;
-    }
+    ESP_LOGI(TAG, "WiFi init finished, connection will proceed in background");
+    
+    return ESP_OK;
 }
 
 wifi_state_t wifi_manager_get_state(void)
@@ -166,4 +146,28 @@ wifi_state_t wifi_manager_get_state(void)
 bool wifi_manager_is_connected(void)
 {
     return s_wifi_state == WIFI_STATE_CONNECTED;
+}
+
+esp_err_t wifi_manager_wait_for_connection(uint32_t timeout_ms)
+{
+    if (s_wifi_event_group == NULL) {
+        return ESP_FAIL;
+    }
+    
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+            pdFALSE,
+            pdFALSE,
+            pdMS_TO_TICKS(timeout_ms));
+    
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "Connected to AP SSID:%s", CONFIG_ESP_WIFI_SSID);
+        return ESP_OK;
+    } else if (bits & WIFI_FAIL_BIT) {
+        ESP_LOGI(TAG, "Failed to connect to SSID:%s", CONFIG_ESP_WIFI_SSID);
+        return ESP_FAIL;
+    } else {
+        ESP_LOGW(TAG, "WiFi connection timeout after %lu ms", timeout_ms);
+        return ESP_ERR_TIMEOUT;
+    }
 } 

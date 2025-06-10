@@ -1,6 +1,6 @@
 # ESP32 Device Controller
 
-A complete IoT solution with FastAPI-based MQTT controller and ESP32 firmware for remote device control via Telegram bot.
+A complete IoT solution with FastAPI-based MQTT controller and ESP32 firmware for remote device control via interactive Telegram bot.
 
 ## 🏗️ Architecture
 
@@ -8,26 +8,40 @@ A complete IoT solution with FastAPI-based MQTT controller and ESP32 firmware fo
 ┌─────────────────┐    MQTT     ┌─────────────────┐    GPIO    ┌─────────────┐
 │  FastAPI Server │◄──────────►│   ESP32 Device  │──────────►│    Relay    │
 │   + Telegram    │             │    (Firmware)   │            │             │
-└─────────────────┘             └─────────────────┘            └─────────────┘
-         ▲                               ▲
+│   Interactive   │             └─────────────────┘            └─────────────┘
+│   Control Panel │                     ▲
+└─────────────────┘                     │
+         ▲                         WiFi Network
          │                               │
-    HTTP/REST                       WiFi Network
-         │                               │
-         ▼                               ▼
-┌─────────────────┐             ┌─────────────────┐
-│   Web Client    │             │  MQTT Broker    │
-│   Mobile App    │             │   (Mosquitto)   │
-└─────────────────┘             └─────────────────┘
+    HTTP/REST                            ▼
+         │                     ┌─────────────────┐
+         ▼                     │  MQTT Broker    │
+┌─────────────────┐            │   (Mosquitto)   │
+│   Web Client    │            └─────────────────┘
+│   Mobile App    │
+└─────────────────┘
 ```
 
 ## 🎯 Features
 
+### 🤖 Interactive Telegram Bot
+- **Smart Control Panels**: Interactive buttons for device control
+- **Real-time Status**: Live device status with refresh capabilities
+- **User-Friendly**: No need to remember command syntax
+- **Error Handling**: Graceful error recovery with user notifications
+
+### 🔧 System Features
 - 🔌 **ESP32 Firmware**: Control relays, status LEDs, WiFi connectivity
-- 🤖 **Telegram Bot**: Remote control via chat commands
 - 📊 **Real-time Monitoring**: Device status and relay states
 - 🌐 **REST API**: Full device management capabilities
 - ⚙️ **Environment Config**: Easy deployment configuration
 - 🔄 **Auto-reconnection**: Robust WiFi and MQTT connectivity
+- 📝 **Centralized Logging**: Color-coded console and file logging
+
+### 🏛️ Modular Architecture
+- **Separation of Concerns**: Clean module separation
+- **Maintainable Code**: Easy to test and debug
+- **Scalable Design**: Add new features easily
 
 ---
 
@@ -88,7 +102,6 @@ TELEGRAM_ALLOWED_USERS  = 123456789,987654321
 # Configuration
 CONFIG_FILE_PATH        = esp_config.json
 LOG_LEVEL              = INFO
-LOG_FORMAT             = %(asctime)s - %(name)s - %(levelname)s - %(message)s
 ```
 
 ### 🔧 ESP32 Firmware Configuration
@@ -110,7 +123,7 @@ Navigate to **"ESP32 Device Controller Configuration"** and set:
 | **MQTT Broker URI** | `"mqtt://192.168.1.100:1883"` | MQTT broker address |
 | **MQTT Username** | `"esp_user"` | MQTT authentication username |
 | **MQTT Password** | `"esp_password"` | MQTT authentication password |
-| **Device ID** | `"esp-cdc-hrm-1"` | Unique device identifier |
+| **Device ID** | `"esp-device-1"` | Unique device identifier |
 | **Relay GPIO Pin** | `2` | GPIO pin for relay control |
 | **Status LED GPIO Pin** | `25` | GPIO pin for status LED |
 
@@ -129,7 +142,7 @@ CONFIG_MQTT_USERNAME="esp_user"
 CONFIG_MQTT_PASSWORD="esp_password"
 
 # Device Configuration
-CONFIG_DEVICE_ID="esp-cdc-hrm-1"
+CONFIG_DEVICE_ID="esp-device-1"
 CONFIG_RELAY_GPIO=2
 CONFIG_STATUS_LED_GPIO=25
 ```
@@ -165,15 +178,35 @@ ESP32 Board          Component
 
 ---
 
-## 🤖 Telegram Bot Commands
+## 🤖 Interactive Telegram Bot
+
+### Enhanced Bot Features
+
+#### Smart Control Panels
+- **Interactive Buttons**: Control devices with button clicks
+- **Real-time Updates**: Live status display with timestamps
+- **Smart Responses**: Dynamic button states based on device connection
+- **Error Recovery**: Graceful handling of API errors
+
+#### Command Interface
+```
+/control esp-device-1
+```
+Opens an interactive control panel with:
+- 🔌 **Turn ON** button
+- ⚫ **Turn OFF** button  
+- 🔄 **Refresh** status
+- ❌ **Close** panel
+
+### Available Commands
 
 | Command | Description | Example |
 |---------|-------------|---------|
 | `/start` | Initialize bot and show welcome | `/start` |
 | `/help` | Show all available commands | `/help` |
 | `/get_devices` | List all connected devices | `/get_devices` |
-| `/status <device_id>` | Get device status and relay state | `/status esp-cdc-hrm-1` |
-| `/control <device_id> <on/off>` | Control device relay | `/control esp-cdc-hrm-1 on` |
+| `/status <device_id>` | Get device status and relay state | `/status esp-device-1` |
+| `/control <device_id>` | Open interactive control panel | `/control esp-device-1` |
 
 ### Setting up Telegram Bot
 
@@ -206,18 +239,24 @@ TELEGRAM_ALLOWED_USERS=YOUR_USER_ID
 
 ### Message Examples
 ```json
-// Relay Control Command
-Topic: esp-cdc-hrm-1/relay/set
+// Relay Control Command (QoS 1)
+Topic: esp-device-1/relay/set
 Payload: "on" | "off"
 
 // Status Updates
-Topic: esp-cdc-hrm-1/status
+Topic: esp-device-1/status
 Payload: "online" | "offline"
 
 // Relay State Confirmation
-Topic: esp-cdc-hrm-1/relay/state
+Topic: esp-device-1/relay/state
 Payload: "on" | "off"
 ```
+
+### Enhanced MQTT Features
+- **QoS 1 Support**: Reliable relay command delivery
+- **Dual Topic Handling**: Separate status and relay feedback
+- **Connection Tracking**: Real-time MQTT connection status
+- **Auto-subscription**: Automatic topic management
 
 ---
 
@@ -235,8 +274,10 @@ DELETE /devices/{device_id}        # Remove device
 ### System Management
 ```http
 GET    /config/reload              # Reload configuration
+GET    /mqtt/status                # Check MQTT connection status
 GET    /telegram/status            # Check Telegram bot status
 POST   /telegram/test_send         # Send test message
+POST   /subscribe/{device_id}      # Subscribe to device topics
 ```
 
 ### Example API Usage
@@ -245,12 +286,16 @@ POST   /telegram/test_send         # Send test message
 curl http://localhost:8000/devices
 
 # Control relay
-curl -X POST http://localhost:8000/devices/esp-cdc-hrm-1/control \
+curl -X POST http://localhost:8000/devices/esp-device-1/control \
   -H "Content-Type: application/json" \
-  -d '{"device": "esp-cdc-hrm-1", "relay_state": "on"}'
+  -d '{"device": "esp-device-1", "relay_state": "on"}'
 
 # Check device status
-curl http://localhost:8000/devices/esp-cdc-hrm-1
+curl http://localhost:8000/devices/esp-device-1
+
+# Check system status
+curl http://localhost:8000/mqtt/status
+curl http://localhost:8000/telegram/status
 ```
 
 ---
@@ -265,8 +310,12 @@ pip install -r requirements.txt
 # Run with auto-reload
 python main.py
 
-# API documentation
-open http://localhost:8000/docs
+# Check logs
+tail -f logs/app.log
+
+# API documentation available at:
+# http://localhost:8000/docs (disabled by default)
+# http://localhost:8000/redoc (disabled by default)
 ```
 
 ### ESP32 Development
@@ -302,9 +351,16 @@ esp-hrm-manager/
 ├── README.md                      # This documentation
 ├── requirements.txt               # Python dependencies
 ├── Dockerfile                     # Container deployment
-├── main.py                       # FastAPI application
-├── config.py                     # Configuration management
-├── environment_template.env      # Environment template
+├── environment_template.env       # Environment template
+├── main.py                       # FastAPI application entry point
+├── config.py                     # Settings and configuration
+├── models.py                     # Data models and enums
+├── managers.py                   # Device configuration management
+├── mqtt_client.py                # MQTT client implementation
+├── telegram_bot.py               # Interactive Telegram bot
+├── logger.py                     # Centralized logging system
+├── logs/
+│   └── app.log                   # Application logs (auto-created)
 └── esp-app/                      # ESP32 firmware
     ├── main/
     │   ├── esp-app.c             # Main firmware code
@@ -316,6 +372,50 @@ esp-hrm-manager/
     │   └── Kconfig.projbuild     # Menu configuration
     ├── sdkconfig.defaults        # Default ESP-IDF config
     └── CMakeLists.txt           # Project build file
+```
+
+### Module Responsibilities
+
+| Module | Purpose |
+|--------|---------|
+| `main.py` | FastAPI application and routing |
+| `models.py` | Data structures, enums, and Pydantic models |
+| `managers.py` | Device configuration and persistence |
+| `mqtt_client.py` | MQTT communication and message handling |
+| `telegram_bot.py` | Interactive bot interface and commands |
+| `logger.py` | Centralized logging with color-coded output |
+
+---
+
+## 📝 Logging System
+
+### Centralized Logging Features
+- **Color-coded Console Output**: Different colors for log levels
+- **Unified Log File**: All logs in `logs/app.log`
+- **Log Rotation**: Automatic log rotation (10MB main file, 5 backups)
+- **Module-specific Loggers**: Organized logger hierarchy
+- **Third-party Logger Suppression**: Reduced noise from dependencies
+
+### Log File Location
+```bash
+# Main application log
+logs/app.log
+
+# Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+# Configurable via LOG_LEVEL environment variable
+```
+
+### Startup Banner Example
+```
+============================================================
+ESP32 Device Controller Starting Up
+============================================================
+Log Level: INFO
+App Host: 0.0.0.0:8000
+MQTT Broker: 192.168.1.100:1883
+Config File: esp_config.json
+Reload Mode: True
+============================================================
 ```
 
 ---
@@ -357,11 +457,18 @@ idf.py --version
 - Verify broker is running: `mosquitto -v`
 - Check firewall settings
 - Verify credentials in `.env` file
+- Check logs: `tail -f logs/app.log`
 
 **Telegram Bot Not Responding:**
 - Verify bot token is correct
 - Check allowed users list
 - Test bot with `/start` command
+- Check bot status: `curl http://localhost:8000/telegram/status`
+
+**Interactive Panel Issues:**
+- "Message is not modified" errors are handled automatically
+- Check device connection status in control panel
+- Use refresh button to update status
 
 ### Device Configuration Reset
 
@@ -376,6 +483,18 @@ idf.py flash
 ```bash
 rm esp_config.json
 python main.py  # Will create default config
+```
+
+**Check System Status:**
+```bash
+# MQTT status
+curl http://localhost:8000/mqtt/status
+
+# Telegram status  
+curl http://localhost:8000/telegram/status
+
+# Device list
+curl http://localhost:8000/devices
 ```
 
 ---

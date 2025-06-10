@@ -1,5 +1,37 @@
 menu "ESP32 Device Controller Configuration"
 
+    choice ESP32_CHIP_TYPE
+        prompt "ESP32 Chip Type"
+        default ESP32_CHIP_ESP32
+        help
+            Select your ESP32 chip type. This will automatically configure GPIO pins and other settings.
+
+        config ESP32_CHIP_ESP32
+            bool "ESP32"
+            help
+                Original ESP32 with 38 GPIO pins (0-39, excluding 6,7,8,9,10,11 which are used for flash)
+
+        config ESP32_CHIP_ESP32C3
+            bool "ESP32-C3"
+            help
+                ESP32-C3 RISC-V based chip with 22 GPIO pins (0-21)
+
+        config ESP32_CHIP_ESP32C6
+            bool "ESP32-C6" 
+            help
+                ESP32-C6 RISC-V based chip with 24 GPIO pins (0-23)
+
+        config ESP32_CHIP_ESP32S2
+            bool "ESP32-S2"
+            help
+                ESP32-S2 with 46 GPIO pins (0-45, excluding some used for flash/PSRAM)
+
+        config ESP32_CHIP_ESP32S3
+            bool "ESP32-S3"
+            help
+                ESP32-S3 with 48 GPIO pins (0-47, excluding some used for flash/PSRAM)
+    endchoice
+
     config ESP_WIFI_SSID
         string "WiFi SSID"
         default "myssid"
@@ -44,18 +76,42 @@ menu "ESP32 Device Controller Configuration"
 
     config RELAY_GPIO
         int "Relay GPIO Pin"
-        default 8
-        range 0 23
+        default 2 if ESP32_CHIP_ESP32
+        default 8 if ESP32_CHIP_ESP32C3
+        default 8 if ESP32_CHIP_ESP32C6
+        default 2 if ESP32_CHIP_ESP32S2
+        default 2 if ESP32_CHIP_ESP32S3
+        range 0 39 if ESP32_CHIP_ESP32
+        range 0 21 if ESP32_CHIP_ESP32C3
+        range 0 23 if ESP32_CHIP_ESP32C6
+        range 0 45 if ESP32_CHIP_ESP32S2
+        range 0 47 if ESP32_CHIP_ESP32S3
         help
             GPIO pin number connected to the relay control.
-            ESP32-C6 has GPIO0-GPIO23 available for general use.
+            ESP32: GPIO0-39 (avoid 6,7,8,9,10,11 - used for flash)
+            ESP32-C3: GPIO0-21
+            ESP32-C6: GPIO0-23
+            ESP32-S2: GPIO0-45 (some pins used for flash/PSRAM)
+            ESP32-S3: GPIO0-47 (some pins used for flash/PSRAM)
 
     config STATUS_LED_GPIO
         int "Status LED GPIO Pin"
-        default 15
-        range 0 23
+        default 25 if ESP32_CHIP_ESP32
+        default 15 if ESP32_CHIP_ESP32C3
+        default 15 if ESP32_CHIP_ESP32C6
+        default 25 if ESP32_CHIP_ESP32S2
+        default 25 if ESP32_CHIP_ESP32S3
+        range 0 39 if ESP32_CHIP_ESP32
+        range 0 21 if ESP32_CHIP_ESP32C3
+        range 0 23 if ESP32_CHIP_ESP32C6
+        range 0 45 if ESP32_CHIP_ESP32S2
+        range 0 47 if ESP32_CHIP_ESP32S3
         help
             GPIO pin number connected to the status LED.
-            ESP32-C6 has GPIO0-GPIO23 available for general use.
+            ESP32: GPIO0-39 (avoid 6,7,8,9,10,11 - used for flash)
+            ESP32-C3: GPIO0-21
+            ESP32-C6: GPIO0-23
+            ESP32-S2: GPIO0-45 (some pins used for flash/PSRAM)
+            ESP32-S3: GPIO0-47 (some pins used for flash/PSRAM)
 
 endmenu 

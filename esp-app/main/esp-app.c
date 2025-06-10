@@ -192,13 +192,33 @@ static void heartbeat_task(void *pvParameters)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "ESP32-C6 Device Controller starting...");
+    ESP_LOGI(TAG, "ESP32 Device Controller starting...");
     ESP_LOGI(TAG, "Device ID: %s", CONFIG_DEVICE_ID);
     
-    if (CONFIG_RELAY_GPIO > 23 || CONFIG_STATUS_LED_GPIO > 23) {
-        ESP_LOGE(TAG, "Invalid GPIO configuration for ESP32-C6!");
-        ESP_LOGE(TAG, "Relay GPIO: %d (max: 23), LED GPIO: %d (max: 23)", 
-                 CONFIG_RELAY_GPIO, CONFIG_STATUS_LED_GPIO);
+    // Dynamic GPIO validation based on chip type
+    int max_gpio = 39;  // Default for ESP32
+    const char* chip_name = "ESP32";
+    
+#ifdef CONFIG_ESP32_CHIP_ESP32C3
+    max_gpio = 21;
+    chip_name = "ESP32-C3";
+#elif defined(CONFIG_ESP32_CHIP_ESP32C6)
+    max_gpio = 23;
+    chip_name = "ESP32-C6";
+#elif defined(CONFIG_ESP32_CHIP_ESP32S2)
+    max_gpio = 45;
+    chip_name = "ESP32-S2";
+#elif defined(CONFIG_ESP32_CHIP_ESP32S3)
+    max_gpio = 47;
+    chip_name = "ESP32-S3";
+#endif
+
+    ESP_LOGI(TAG, "Chip type: %s", chip_name);
+    
+    if (CONFIG_RELAY_GPIO > max_gpio || CONFIG_STATUS_LED_GPIO > max_gpio) {
+        ESP_LOGE(TAG, "Invalid GPIO configuration for %s!", chip_name);
+        ESP_LOGE(TAG, "Relay GPIO: %d (max: %d), LED GPIO: %d (max: %d)", 
+                 CONFIG_RELAY_GPIO, max_gpio, CONFIG_STATUS_LED_GPIO, max_gpio);
         ESP_LOGE(TAG, "Please update sdkconfig with valid GPIO pins");
         return;
     }
@@ -223,7 +243,6 @@ void app_main(void)
     ESP_LOGI(TAG, "NVS initialized successfully");
     ESP_LOGI(TAG, "Free heap after NVS: %lu bytes", esp_get_free_heap_size());
     
-    // Initialize components
     ESP_LOGI(TAG, "Initializing GPIO components...");
     
     ESP_LOGI(TAG, "Initializing status LED...");
@@ -231,50 +250,45 @@ void app_main(void)
     ESP_LOGI(TAG, "Status LED initialized");
     ESP_LOGI(TAG, "Free heap after LED init: %lu bytes", esp_get_free_heap_size());
     
-    // Delay before creating tasks
     vTaskDelay(pdMS_TO_TICKS(100));
     
-    // Set initial LED state
-    update_status_led(0); // Start with LED off
+    update_status_led(0);
     ESP_LOGI(TAG, "Status LED task setup complete");
     ESP_LOGI(TAG, "Free heap after LED task: %lu bytes", esp_get_free_heap_size());
     
-    // Initialize relay control
     ESP_LOGI(TAG, "Initializing relay control...");
     esp_err_t relay_err = relay_control_init();
     if (relay_err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize relay control: %s", esp_err_to_name(relay_err));
-        return;
+        ESP_LOGE(TAG, "System will continue without relay functionality");
+    } else {
+        ESP_LOGI(TAG, "Relay control initialized");
     }
-    ESP_LOGI(TAG, "Relay control initialized");
     ESP_LOGI(TAG, "Free heap after relay init: %lu bytes", esp_get_free_heap_size());
     
     vTaskDelay(pdMS_TO_TICKS(200));
     
-    // Initialize WiFi manager
     ESP_LOGI(TAG, "Initializing WiFi manager...");
     esp_err_t wifi_err = wifi_manager_init(wifi_event_callback);
     if (wifi_err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize WiFi manager: %s", esp_err_to_name(wifi_err));
-        return;
+        ESP_LOGE(TAG, "System will continue without WiFi functionality");
+    } else {
+        ESP_LOGI(TAG, "WiFi manager initialized");
     }
-    ESP_LOGI(TAG, "WiFi manager initialized");
     ESP_LOGI(TAG, "Free heap after WiFi init: %lu bytes", esp_get_free_heap_size());
-    
 
     vTaskDelay(pdMS_TO_TICKS(200));
     
-    // Initialize MQTT client
     ESP_LOGI(TAG, "Initializing MQTT client...");
     esp_err_t mqtt_err = mqtt_client_init();
     if (mqtt_err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize MQTT client: %s", esp_err_to_name(mqtt_err));
-        return;
+        ESP_LOGE(TAG, "System will continue without MQTT functionality");
+    } else {
+        ESP_LOGI(TAG, "MQTT client initialized");
     }
-    ESP_LOGI(TAG, "MQTT client initialized");
     ESP_LOGI(TAG, "Free heap after MQTT init: %lu bytes", esp_get_free_heap_size());
-    
-    ESP_LOGI(TAG, "Starting WiFi connection...");
     
     ESP_LOGI(TAG, "Creating heartbeat task...");
     BaseType_t heartbeat_result = xTaskCreate(
@@ -293,27 +307,40 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Free heap after heartbeat task: %lu bytes", esp_get_free_heap_size());
     
-    ESP_LOGI(TAG, "ESP32-C6 Device Controller initialized successfully");
+    ESP_LOGI(TAG, "%s Device Controller initialized successfully", chip_name);
     ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
     
-    // Start WiFi connection 
-    ESP_LOGI(TAG, "Starting WiFi connection process...");
-    esp_err_t wifi_start_err = wifi_manager_start();
-    if (wifi_start_err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(wifi_start_err));
+    if (wifi_err == ESP_OK) {
+        ESP_LOGI(TAG, "Starting WiFi connection...");
+        esp_err_t wifi_start_err = wifi_manager_start();
+        if (wifi_start_err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(wifi_start_err));
+        } else {
+            ESP_LOGI(TAG, "WiFi connection started, waiting for result...");
+            esp_err_t wait_result = wifi_manager_wait_for_connection(30000);
+            if (wait_result == ESP_OK) {
+                ESP_LOGI(TAG, "WiFi connected successfully");
+            } else if (wait_result == ESP_ERR_TIMEOUT) {
+                ESP_LOGW(TAG, "WiFi connection timeout, will retry in background");
+            } else {
+                ESP_LOGW(TAG, "WiFi connection failed, will retry in background");
+            }
+        }
     }
     
     vTaskDelay(pdMS_TO_TICKS(500));
     ESP_LOGI(TAG, "Entering main loop");
     
     while (1) {
-        
         static int loop_count = 0;
         if (loop_count % 10 == 0) {  
             ESP_LOGI(TAG, "Free heap size: %lu bytes", esp_get_free_heap_size());
             ESP_LOGI(TAG, "Minimum free heap: %lu bytes", esp_get_minimum_free_heap_size());
+            ESP_LOGI(TAG, "WiFi state: %d, MQTT state: %d", 
+                    wifi_manager_get_state(), 
+                    mqtt_client_get_state());
         }
         loop_count++;
-        vTaskDelay(pdMS_TO_TICKS(10000)); 
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }

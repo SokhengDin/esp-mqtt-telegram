@@ -40,6 +40,13 @@ esp_err_t wifi_manager_init(wifi_event_callback_t callback);
 esp_err_t wifi_manager_start(void);
 
 /**
+ * @brief Wait for WiFi connection with timeout
+ * @param timeout_ms Timeout in milliseconds
+ * @return ESP_OK if connected, ESP_FAIL if failed, ESP_ERR_TIMEOUT if timeout
+ */
+esp_err_t wifi_manager_wait_for_connection(uint32_t timeout_ms);
+
+/**
  * @brief Get current WiFi state
  * 
  * @return wifi_state_t Current WiFi state

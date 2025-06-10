@@ -40,7 +40,7 @@ Navigate to **ESP32 Device Controller Configuration** and set:
 - **MQTT Broker URI**: e.g., `mqtt://192.168.1.100:1883`
 - **MQTT Username**: (optional)
 - **MQTT Password**: (optional)
-- **Device ID**: Unique identifier (e.g., `esp-cdc-hrm-1`)
+- **Device ID**: Unique identifier (e.g., `esp-device-1`)
 - **Relay GPIO Pin**: GPIO pin for relay control
 - **Status LED GPIO Pin**: GPIO pin for status LED
 
@@ -76,10 +76,10 @@ The device uses the following MQTT topics (where `{device_id}` is your configure
 To control the relay via MQTT:
 ```bash
 # Turn relay ON
-mosquitto_pub -h your-mqtt-broker -t "esp-cdc-hrm-1/relay/set" -m "on"
+mosquitto_pub -h your-mqtt-broker -t "esp-device-1/relay/set" -m "on"
 
 # Turn relay OFF
-mosquitto_pub -h your-mqtt-broker -t "esp-cdc-hrm-1/relay/set" -m "off"
+mosquitto_pub -h your-mqtt-broker -t "esp-device-1/relay/set" -m "off"
 ```
 
 ## Project Structure
