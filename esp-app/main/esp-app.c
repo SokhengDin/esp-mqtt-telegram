@@ -33,17 +33,16 @@ static void status_led_set(bool on)
     gpio_set_level(CONFIG_STATUS_LED_GPIO, on ? 1 : 0);
 }
 
-// Make the LED pattern variable static to avoid race conditions
 static volatile int current_led_pattern = 0;
 static TaskHandle_t led_task_handle = NULL;
 
-// Status LED blink patterns
+// Status LED 
 static void status_led_blink_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "Status LED task started");
     
     while (1) {
-        // Read the current pattern safely
+        
         int pattern = current_led_pattern;
         
         switch (pattern) {
@@ -59,7 +58,7 @@ static void status_led_blink_task(void *pvParameters)
                 vTaskDelay(pdMS_TO_TICKS(500));
                 break;
                 
-            case 2: // Fast blink - WiFi connected, MQTT connecting
+            case 2: // Fast blink - WiFi connected
                 status_led_set(true);
                 vTaskDelay(pdMS_TO_TICKS(200));
                 status_led_set(false);
@@ -84,18 +83,18 @@ static void update_status_led(int pattern)
     
 
     if (led_task_handle == NULL) {
-        // Check available heap before creating task
+        // Check available heap
         size_t free_heap = esp_get_free_heap_size();
         if (free_heap < 8192) { 
-            ESP_LOGW(TAG, "Insufficient heap for LED task: %zu bytes", free_heap);
+            ESP_LOGW(TAG, "Insufficient heap for LED task: %lu bytes", free_heap);
             return;
         }
         
         BaseType_t result = xTaskCreate(
             status_led_blink_task, 
             "status_led", 
-            4096,  // Increased stack size
-            NULL,  // No parameter needed now
+            4096,  
+            NULL,  
             3,     // Lower priority than critical tasks
             &led_task_handle
         );
@@ -105,7 +104,7 @@ static void update_status_led(int pattern)
             led_task_handle = NULL;
         } else {
             ESP_LOGI(TAG, "Status LED task created successfully");
-            // Small delay to let task start
+            
             vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
@@ -194,10 +193,10 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "ESP32 Device Controller starting...");
     ESP_LOGI(TAG, "Device ID: %s", CONFIG_DEVICE_ID);
-    
-    // Dynamic GPIO validation based on chip type
-    int max_gpio = 39;  // Default for ESP32
-    const char* chip_name = "ESP32";
+
+
+    int max_gpio            = 39;  // Default for ESP32
+    const char* chip_name   = "ESP32";
     
 #ifdef CONFIG_ESP32_CHIP_ESP32C3
     max_gpio = 21;
