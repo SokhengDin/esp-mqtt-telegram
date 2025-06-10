@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  esp-mqtt-telegram:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: esp-mqtt-telegram-app
+    restart: unless-stopped
+    environment:
+      # MQTT Configuration
+      - MQTT_BROKER_HOST=${MQTT_BROKER_HOST}
+      - MQTT_BROKER_PORT=${MQTT_BROKER_PORT}
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      
+      # Telegram Configuration
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS}
+    
