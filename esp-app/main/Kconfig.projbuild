@@ -44,16 +44,18 @@ menu "ESP32 Device Controller Configuration"
 
     config RELAY_GPIO
         int "Relay GPIO Pin"
-        default 2
-        range 0 39
+        default 8
+        range 0 23
         help
             GPIO pin number connected to the relay control.
+            ESP32-C6 has GPIO0-GPIO23 available for general use.
 
     config STATUS_LED_GPIO
         int "Status LED GPIO Pin"
-        default 25
-        range 0 39
+        default 15
+        range 0 23
         help
             GPIO pin number connected to the status LED.
+            ESP32-C6 has GPIO0-GPIO23 available for general use.
 
 endmenu 

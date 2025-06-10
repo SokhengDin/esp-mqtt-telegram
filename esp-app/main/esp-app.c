@@ -81,14 +81,23 @@ static void status_led_blink_task(void *pvParameters)
 static void update_status_led(int pattern)
 {
     current_led_pattern = pattern;
+    
+    // Only create the task if it doesn't exist and we have sufficient heap
     if (led_task_handle == NULL) {
+        // Check available heap before creating task
+        size_t free_heap = esp_get_free_heap_size();
+        if (free_heap < 8192) {  // Need at least 8KB free for the task
+            ESP_LOGW(TAG, "Insufficient heap for LED task: %lu bytes", free_heap);
+            return;
+        }
+        
         // Increased stack size from 2048 to 4096 to prevent stack overflow
         BaseType_t result = xTaskCreate(
             status_led_blink_task, 
             "status_led", 
             4096,  // Increased stack size
             NULL,  // No parameter needed now
-            5, 
+            3,     // Lower priority than critical tasks
             &led_task_handle
         );
         
@@ -97,6 +106,8 @@ static void update_status_led(int pattern)
             led_task_handle = NULL;
         } else {
             ESP_LOGI(TAG, "Status LED task created successfully");
+            // Small delay to let task start
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
 }
@@ -182,42 +193,95 @@ static void heartbeat_task(void *pvParameters)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "ESP32 Device Controller starting...");
+    ESP_LOGI(TAG, "ESP32-C6 Device Controller starting...");
     ESP_LOGI(TAG, "Device ID: %s", CONFIG_DEVICE_ID);
+    
+    if (CONFIG_RELAY_GPIO > 23 || CONFIG_STATUS_LED_GPIO > 23) {
+        ESP_LOGE(TAG, "Invalid GPIO configuration for ESP32-C6!");
+        ESP_LOGE(TAG, "Relay GPIO: %d (max: 23), LED GPIO: %d (max: 23)", 
+                 CONFIG_RELAY_GPIO, CONFIG_STATUS_LED_GPIO);
+        ESP_LOGE(TAG, "Please update sdkconfig with valid GPIO pins");
+        return;
+    }
+    
     ESP_LOGI(TAG, "Relay GPIO: %d", CONFIG_RELAY_GPIO);
     ESP_LOGI(TAG, "Status LED GPIO: %d", CONFIG_STATUS_LED_GPIO);
     
-    // Initialize NVS
+    ESP_LOGI(TAG, "Initial free heap size: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Minimum free heap size: %lu bytes", esp_get_minimum_free_heap_size());
+    
+    ESP_LOGI(TAG, "Allowing system to stabilize...");
+    vTaskDelay(pdMS_TO_TICKS(500));
+    
+    ESP_LOGI(TAG, "Initializing NVS...");
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "NVS partition needs to be erased");
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+    ESP_LOGI(TAG, "NVS initialized successfully");
+    ESP_LOGI(TAG, "Free heap after NVS: %lu bytes", esp_get_free_heap_size());
     
     // Initialize components
-    ESP_LOGI(TAG, "Initializing components...");
+    ESP_LOGI(TAG, "Initializing GPIO components...");
     
-    // Initialize status LED
+    ESP_LOGI(TAG, "Initializing status LED...");
     status_led_init();
+    ESP_LOGI(TAG, "Status LED initialized");
+    ESP_LOGI(TAG, "Free heap after LED init: %lu bytes", esp_get_free_heap_size());
+    
+    // Delay before creating tasks
+    vTaskDelay(pdMS_TO_TICKS(100));
+    
+    // Set initial LED state
     update_status_led(0); // Start with LED off
+    ESP_LOGI(TAG, "Status LED task setup complete");
+    ESP_LOGI(TAG, "Free heap after LED task: %lu bytes", esp_get_free_heap_size());
     
     // Initialize relay control
-    ESP_ERROR_CHECK(relay_control_init());
+    ESP_LOGI(TAG, "Initializing relay control...");
+    esp_err_t relay_err = relay_control_init();
+    if (relay_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize relay control: %s", esp_err_to_name(relay_err));
+        return;
+    }
+    ESP_LOGI(TAG, "Relay control initialized");
+    ESP_LOGI(TAG, "Free heap after relay init: %lu bytes", esp_get_free_heap_size());
+    
+    vTaskDelay(pdMS_TO_TICKS(200));
     
     // Initialize WiFi manager
-    ESP_ERROR_CHECK(wifi_manager_init(wifi_event_callback));
+    ESP_LOGI(TAG, "Initializing WiFi manager...");
+    esp_err_t wifi_err = wifi_manager_init(wifi_event_callback);
+    if (wifi_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize WiFi manager: %s", esp_err_to_name(wifi_err));
+        return;
+    }
+    ESP_LOGI(TAG, "WiFi manager initialized");
+    ESP_LOGI(TAG, "Free heap after WiFi init: %lu bytes", esp_get_free_heap_size());
+    
+
+    vTaskDelay(pdMS_TO_TICKS(200));
     
     // Initialize MQTT client
-    ESP_ERROR_CHECK(mqtt_client_init());
+    ESP_LOGI(TAG, "Initializing MQTT client...");
+    esp_err_t mqtt_err = mqtt_client_init();
+    if (mqtt_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize MQTT client: %s", esp_err_to_name(mqtt_err));
+        return;
+    }
+    ESP_LOGI(TAG, "MQTT client initialized");
+    ESP_LOGI(TAG, "Free heap after MQTT init: %lu bytes", esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "Starting WiFi connection...");
     
-    // Create heartbeat task with increased stack size
+    ESP_LOGI(TAG, "Creating heartbeat task...");
     BaseType_t heartbeat_result = xTaskCreate(
         heartbeat_task, 
         "heartbeat", 
-        6144,  // Increased from 4096 to 6144
+        8192,  
         NULL, 
         5, 
         NULL
@@ -228,22 +292,29 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "Heartbeat task created successfully");
     }
+    ESP_LOGI(TAG, "Free heap after heartbeat task: %lu bytes", esp_get_free_heap_size());
     
-    ESP_LOGI(TAG, "ESP32 Device Controller initialized successfully");
+    ESP_LOGI(TAG, "ESP32-C6 Device Controller initialized successfully");
     ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
     
     // Start WiFi connection (non-blocking)
-    esp_err_t wifi_err = wifi_manager_start();
-    if (wifi_err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(wifi_err));
+    ESP_LOGI(TAG, "Starting WiFi connection process...");
+    esp_err_t wifi_start_err = wifi_manager_start();
+    if (wifi_start_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(wifi_start_err));
     }
     
-    // Add small delay to allow tasks to initialize
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(500));
+    ESP_LOGI(TAG, "Entering main loop");
     
     while (1) {
-        // Print available heap memory periodically for debugging
-        ESP_LOGI(TAG, "Free heap size: %lu bytes", esp_get_free_heap_size());
-        vTaskDelay(pdMS_TO_TICKS(10000)); // Every 10 seconds
+        
+        static int loop_count = 0;
+        if (loop_count % 10 == 0) {  
+            ESP_LOGI(TAG, "Free heap size: %lu bytes", esp_get_free_heap_size());
+            ESP_LOGI(TAG, "Minimum free heap: %lu bytes", esp_get_minimum_free_heap_size());
+        }
+        loop_count++;
+        vTaskDelay(pdMS_TO_TICKS(10000)); 
     }
 }
