@@ -21,6 +21,10 @@ services:
     networks:
       - esp-network
 
+    volumes:
+      - ./logs:/app/logs
+      - ./esp_config.json:/app/esp_config.json
+
 
 networks:
   esp-network:
