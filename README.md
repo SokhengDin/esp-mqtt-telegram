@@ -6,7 +6,7 @@ A complete IoT solution with FastAPI-based MQTT controller and ESP32 firmware fo
 
 ```
 ┌─────────────────┐    MQTT     ┌─────────────────┐    GPIO    ┌─────────────┐
-│  FastAPI Server │◄──────────►│   ESP32 Device  │──────────►│    Relay    │
+│  FastAPI Server │◄──────────►│   ESP32 Device  │──────────►│    Relay      │
 │   + Telegram    │             │    (Firmware)   │            │             │
 │   Interactive   │             └─────────────────┘            └─────────────┘
 │   Control Panel │                     ▲
@@ -22,26 +22,6 @@ A complete IoT solution with FastAPI-based MQTT controller and ESP32 firmware fo
 └─────────────────┘
 ```
 
-## 🎯 Features
-
-### 🤖 Interactive Telegram Bot
-- **Smart Control Panels**: Interactive buttons for device control
-- **Real-time Status**: Live device status with refresh capabilities
-- **User-Friendly**: No need to remember command syntax
-- **Error Handling**: Graceful error recovery with user notifications
-
-### 🔧 System Features
-- 🔌 **ESP32 Firmware**: Control relays, status LEDs, WiFi connectivity
-- 📊 **Real-time Monitoring**: Device status and relay states
-- 🌐 **REST API**: Full device management capabilities
-- ⚙️ **Environment Config**: Easy deployment configuration
-- 🔄 **Auto-reconnection**: Robust WiFi and MQTT connectivity
-- 📝 **Centralized Logging**: Color-coded console and file logging
-
-### 🏛️ Modular Architecture
-- **Separation of Concerns**: Clean module separation
-- **Maintainable Code**: Easy to test and debug
-- **Scalable Design**: Add new features easily
 
 ---
 
