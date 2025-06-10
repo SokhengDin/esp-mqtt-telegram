@@ -1,4 +1,5 @@
 import datetime
+import zoneinfo
 from typing import List
 
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -406,8 +407,9 @@ Use the buttons below to control the relay:
     
     async def _handle_refresh(self, query, device_id: str):
         try:
-            # Add timestamp to ensure message content changes
-            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            
+            cambodia_tz = zoneinfo.ZoneInfo("Asia/Phnom_Penh")
+            timestamp   = datetime.datetime.now(cambodia_tz).strftime("%H:%M:%S")
             await self._update_control_panel(query, device_id, f"🔄 Status refreshed at {timestamp}")
         except Exception as e:
             logger.error(f"Error refreshing status: {e}")
