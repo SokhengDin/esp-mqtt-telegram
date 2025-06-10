@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: esp-mqtt-telegram-app
     restart: unless-stopped
+    user: "1000:1000"
     environment:
       - MQTT_BROKER_HOST=${MQTT_BROKER_HOST}
       - MQTT_BROKER_PORT=${MQTT_BROKER_PORT}
