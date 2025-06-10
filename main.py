@@ -280,6 +280,11 @@ class TelegramBot:
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
+        # Check if update has a message to reply to
+        if not update.effective_message:
+            logger.error("No effective message in update")
+            return
+            
         user_id = update.effective_user.id
         username = update.effective_user.username or "Unknown"
         
@@ -287,7 +292,7 @@ class TelegramBot:
         
         if not self._is_authorized(user_id):
             logger.warning(f"TELEGRAM: Unauthorized access attempt by {username} ({user_id})")
-            await update.message.reply_text("❌ Unauthorized access. Contact administrator.")
+            await update.effective_message.reply_text("❌ Unauthorized access. Contact administrator.")
             return
         
         welcome_message = """
@@ -306,15 +311,20 @@ Example:
 `/control esp-cdc-hrm-1 on`
         """
         
-        await update.message.reply_text(welcome_message, parse_mode="Markdown")
+        await update.effective_message.reply_text(welcome_message, parse_mode="Markdown")
         logger.info(f"TELEGRAM: Sent welcome message to {username} ({user_id})")
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command"""
+        # Check if update has a message to reply to
+        if not update.effective_message:
+            logger.error("No effective message in update")
+            return
+            
         user_id = update.effective_user.id
         
         if not self._is_authorized(user_id):
-            await update.message.reply_text("❌ Unauthorized access.")
+            await update.effective_message.reply_text("❌ Unauthorized access.")
             return
         
         help_message = """
@@ -337,24 +347,28 @@ Example:
    Shows this help message
         """
         
-        await update.message.reply_text(help_message, parse_mode="Markdown")
+        await update.effective_message.reply_text(help_message, parse_mode="Markdown")
     
     async def get_devices_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /get_devices command"""
+        if not update.effective_message:
+            logger.error("No effective message in update")
+            return
+            
         user_id = update.effective_user.id
         username = update.effective_user.username or "Unknown"
         
         logger.info(f"User {username} ({user_id}) requested device list")
         
         if not self._is_authorized(user_id):
-            await update.message.reply_text("❌ Unauthorized access.")
+            await update.effective_message.reply_text("❌ Unauthorized access.")
             return
         
         try:
             devices = list(self.config_manager.devices_db.values())
             
             if not devices:
-                await update.message.reply_text("📭 No devices found.")
+                await update.effective_message.reply_text("📭 No devices found.")
                 return
             
             message = "📱 *ESP32 Devices:*\n\n"
@@ -368,23 +382,31 @@ Example:
                 message += f"   Relay: {relay_emoji} {device.relay_state}\n"
                 message += f"   Topic: `{device.mqtt_topic}`\n\n"
             
-            await update.message.reply_text(message, parse_mode="Markdown")
+            await update.effective_message.reply_text(message, parse_mode="Markdown")
             
         except Exception as e:
             logger.error(f"Error in get_devices_command: {e}")
-            await update.message.reply_text("❌ Error retrieving device list.")
+            try:
+                await update.effective_message.reply_text("❌ Error retrieving device list.")
+            except Exception as reply_error:
+                logger.error(f"Failed to send error message: {reply_error}")
     
     async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /status <device_id> command"""
+        
+        if not update.effective_message:
+            logger.error("No effective message in update")
+            return
+            
         user_id = update.effective_user.id
         username = update.effective_user.username or "Unknown"
         
         if not self._is_authorized(user_id):
-            await update.message.reply_text("❌ Unauthorized access.")
+            await update.effective_message.reply_text("❌ Unauthorized access.")
             return
         
         if not context.args:
-            await update.message.reply_text("❌ Usage: `/status <device_id>`\nExample: `/status esp-cdc-hrm-1`", parse_mode="Markdown")
+            await update.effective_message.reply_text("❌ Usage: `/status <device_id>`\nExample: `/status esp-cdc-hrm-1`", parse_mode="Markdown")
             return
         
         device_id = context.args[0]
@@ -394,11 +416,11 @@ Example:
             device = self.config_manager.get_device(device_id)
             
             if not device:
-                await update.message.reply_text(f"❌ Device `{device_id}` not found.")
+                await update.effective_message.reply_text(f"❌ Device `{device_id}` not found.")
                 return
             
-            status_emoji = "🟢" if device.status == DeviceStatus.connected else "🔴"
-            relay_emoji = "🔌" if device.relay_state == RelayState.on else "⚫"
+            status_emoji = "🟢" if device.status == DeviceStatus.connected.value else "🔴"
+            relay_emoji = "🔌" if device.relay_state == RelayState.on.value else "⚫"
             
             message = f"""
 📊 *Device Status: {device.device}*
@@ -408,23 +430,30 @@ Example:
 🏷️ **MQTT Topic:** `{device.mqtt_topic}`
             """
             
-            await update.message.reply_text(message, parse_mode="Markdown")
+            await update.effective_message.reply_text(message, parse_mode="Markdown")
             
         except Exception as e:
             logger.error(f"Error in status_command: {e}")
-            await update.message.reply_text("❌ Error retrieving device status.")
+            try:
+                await update.effective_message.reply_text("❌ Error retrieving device status.")
+            except Exception as reply_error:
+                logger.error(f"Failed to send error message: {reply_error}")
     
     async def control_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /control <device_id> <on/off> command"""
-        user_id = update.effective_user.id
-        username = update.effective_user.username or "Unknown"
+        
+        if not update.effective_message:
+            logger.error("No effective message in update")
+            return
+            
+        user_id     = update.effective_user.id
+        username    = update.effective_user.username or "Unknown"
         
         if not self._is_authorized(user_id):
-            await update.message.reply_text("❌ Unauthorized access.")
+            await update.effective_message.reply_text("❌ Unauthorized access.")
             return
         
         if len(context.args) != 2:
-            await update.message.reply_text(
+            await update.effective_message.reply_text(
                 "❌ Usage: `/control <device_id> <on/off>`\n"
                 "Examples:\n"
                 "• `/control esp-cdc-hrm-1 on`\n"
@@ -437,7 +466,7 @@ Example:
         relay_command = context.args[1].lower()
         
         if relay_command not in ["on", "off"]:
-            await update.message.reply_text("❌ Relay state must be 'on' or 'off'")
+            await update.effective_message.reply_text("❌ Relay state must be 'on' or 'off'")
             return
         
         logger.info(f"User {username} ({user_id}) controlling {device_id}: {relay_command}")
@@ -446,21 +475,20 @@ Example:
             device = self.config_manager.get_device(device_id)
             
             if not device:
-                await update.message.reply_text(f"❌ Device `{device_id}` not found.")
+                await update.effective_message.reply_text(f"❌ Device `{device_id}` not found.")
                 return
             
             if device.status == DeviceStatus.disconnected:
-                await update.message.reply_text(f"❌ Device `{device_id}` is disconnected. Cannot control relay.")
+                await update.effective_message.reply_text(f"❌ Device `{device_id}` is disconnected. Cannot control relay.")
                 return
             
-            # Convert command to RelayState
             relay_state = RelayState.on if relay_command == "on" else RelayState.off
             
             # Send MQTT command
             self.mqtt_manager.publish_relay_control(device_id, relay_state)
             
             relay_emoji = "🔌" if relay_state == RelayState.on else "⚫"
-            await update.message.reply_text(
+            await update.effective_message.reply_text(
                 f"✅ Relay command sent successfully!\n"
                 f"{relay_emoji} Device `{device_id}` relay set to **{relay_state.value}**",
                 parse_mode="Markdown"
@@ -468,7 +496,10 @@ Example:
             
         except Exception as e:
             logger.error(f"Error in control_command: {e}")
-            await update.message.reply_text(f"❌ Failed to control device: {str(e)}")
+            try:
+                await update.effective_message.reply_text(f"❌ Failed to control device: {str(e)}")
+            except Exception as reply_error:
+                logger.error(f"Failed to send error message: {reply_error}")
 
 config_manager  = ConfigManager()
 mqtt_manager    = MQTTManager(config_manager=config_manager)

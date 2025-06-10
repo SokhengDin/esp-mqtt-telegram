@@ -192,18 +192,16 @@ void app_main(void)
     
     ESP_LOGI(TAG, "Starting WiFi connection...");
     
-    // Start WiFi connection
-    if (wifi_manager_start() == ESP_OK) {
-        ESP_LOGI(TAG, "WiFi connected successfully");
-        
-        // Create heartbeat task
-        xTaskCreate(heartbeat_task, "heartbeat", 4096, NULL, 5, NULL);
-        
-        ESP_LOGI(TAG, "ESP32 Device Controller initialized successfully");
-        ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
-        
-    } else {
-        ESP_LOGE(TAG, "Failed to connect to WiFi");
+    // Create heartbeat task (it will wait for connections)
+    xTaskCreate(heartbeat_task, "heartbeat", 4096, NULL, 5, NULL);
+    
+    ESP_LOGI(TAG, "ESP32 Device Controller initialized successfully");
+    ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
+    
+    // Start WiFi connection (non-blocking)
+    esp_err_t wifi_err = wifi_manager_start();
+    if (wifi_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(wifi_err));
     }
     
     while (1) {
