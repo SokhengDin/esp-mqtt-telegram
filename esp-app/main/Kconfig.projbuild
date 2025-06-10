@@ -1,0 +1,59 @@
+menu "ESP32 Device Controller Configuration"
+
+    config ESP_WIFI_SSID
+        string "WiFi SSID"
+        default "myssid"
+        help
+            SSID (network name) for the WiFi network to connect to.
+
+    config ESP_WIFI_PASSWORD
+        string "WiFi Password"
+        default "mypassword"
+        help
+            WiFi password (WPA or WPA2) for the access point.
+
+    config ESP_MAXIMUM_RETRY
+        int "Maximum retry"
+        default 5
+        help
+            Set the Maximum retry to avoid station reconnecting to the AP unlimited when the AP is really inexistent.
+
+    config MQTT_BROKER_URI
+        string "MQTT Broker URI"
+        default "mqtt://localhost:1883"
+        help
+            URI of the MQTT broker to connect to.
+
+    config MQTT_USERNAME
+        string "MQTT Username"
+        default ""
+        help
+            Username for MQTT broker authentication (leave empty if not required).
+
+    config MQTT_PASSWORD
+        string "MQTT Password"
+        default ""
+        help
+            Password for MQTT broker authentication (leave empty if not required).
+
+    config DEVICE_ID
+        string "Device ID"
+        default "esp-cdc-hrm-1"
+        help
+            Unique identifier for this ESP32 device.
+
+    config RELAY_GPIO
+        int "Relay GPIO Pin"
+        default 2
+        range 0 39
+        help
+            GPIO pin number connected to the relay control.
+
+    config STATUS_LED_GPIO
+        int "Status LED GPIO Pin"
+        default 25
+        range 0 39
+        help
+            GPIO pin number connected to the status LED.
+
+endmenu 
