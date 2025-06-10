@@ -206,8 +206,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Relay GPIO: %d", CONFIG_RELAY_GPIO);
     ESP_LOGI(TAG, "Status LED GPIO: %d", CONFIG_STATUS_LED_GPIO);
     
-    ESP_LOGI(TAG, "Initial free heap size: %zu bytes", esp_get_free_heap_size());
-    ESP_LOGI(TAG, "Minimum free heap size: %zu bytes", esp_get_minimum_free_heap_size());
+    ESP_LOGI(TAG, "Initial free heap size: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Minimum free heap size: %lu bytes", esp_get_minimum_free_heap_size());
     
     ESP_LOGI(TAG, "Allowing system to stabilize...");
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -221,7 +221,7 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "NVS initialized successfully");
-    ESP_LOGI(TAG, "Free heap after NVS: %zu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after NVS: %lu bytes", esp_get_free_heap_size());
     
     // Initialize components
     ESP_LOGI(TAG, "Initializing GPIO components...");
@@ -229,7 +229,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing status LED...");
     status_led_init();
     ESP_LOGI(TAG, "Status LED initialized");
-    ESP_LOGI(TAG, "Free heap after LED init: %zu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after LED init: %lu bytes", esp_get_free_heap_size());
     
     // Delay before creating tasks
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -237,7 +237,7 @@ void app_main(void)
     // Set initial LED state
     update_status_led(0); // Start with LED off
     ESP_LOGI(TAG, "Status LED task setup complete");
-    ESP_LOGI(TAG, "Free heap after LED task: %zu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after LED task: %lu bytes", esp_get_free_heap_size());
     
     // Initialize relay control
     ESP_LOGI(TAG, "Initializing relay control...");
@@ -247,7 +247,7 @@ void app_main(void)
         return;
     }
     ESP_LOGI(TAG, "Relay control initialized");
-    ESP_LOGI(TAG, "Free heap after relay init: %zu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after relay init: %lu bytes", esp_get_free_heap_size());
     
     vTaskDelay(pdMS_TO_TICKS(200));
     
@@ -259,7 +259,7 @@ void app_main(void)
         return;
     }
     ESP_LOGI(TAG, "WiFi manager initialized");
-    ESP_LOGI(TAG, "Free heap after WiFi init: %zu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after WiFi init: %lu bytes", esp_get_free_heap_size());
     
 
     vTaskDelay(pdMS_TO_TICKS(200));
@@ -272,7 +272,7 @@ void app_main(void)
         return;
     }
     ESP_LOGI(TAG, "MQTT client initialized");
-    ESP_LOGI(TAG, "Free heap after MQTT init: %zu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after MQTT init: %lu bytes", esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "Starting WiFi connection...");
     
@@ -291,12 +291,12 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "Heartbeat task created successfully");
     }
-    ESP_LOGI(TAG, "Free heap after heartbeat task: %zu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after heartbeat task: %lu bytes", esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "ESP32-C6 Device Controller initialized successfully");
     ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
     
-    // Start WiFi connection (non-blocking)
+    // Start WiFi connection 
     ESP_LOGI(TAG, "Starting WiFi connection process...");
     esp_err_t wifi_start_err = wifi_manager_start();
     if (wifi_start_err != ESP_OK) {
@@ -310,8 +310,8 @@ void app_main(void)
         
         static int loop_count = 0;
         if (loop_count % 10 == 0) {  
-            ESP_LOGI(TAG, "Free heap size: %zu bytes", esp_get_free_heap_size());
-            ESP_LOGI(TAG, "Minimum free heap: %zu bytes", esp_get_minimum_free_heap_size());
+            ESP_LOGI(TAG, "Free heap size: %lu bytes", esp_get_free_heap_size());
+            ESP_LOGI(TAG, "Minimum free heap: %lu bytes", esp_get_minimum_free_heap_size());
         }
         loop_count++;
         vTaskDelay(pdMS_TO_TICKS(10000)); 
