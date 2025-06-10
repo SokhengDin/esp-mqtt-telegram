@@ -82,16 +82,15 @@ static void update_status_led(int pattern)
 {
     current_led_pattern = pattern;
     
-    // Only create the task if it doesn't exist and we have sufficient heap
+
     if (led_task_handle == NULL) {
         // Check available heap before creating task
         size_t free_heap = esp_get_free_heap_size();
-        if (free_heap < 8192) {  // Need at least 8KB free for the task
-            ESP_LOGW(TAG, "Insufficient heap for LED task: %lu bytes", free_heap);
+        if (free_heap < 8192) { 
+            ESP_LOGW(TAG, "Insufficient heap for LED task: %zu bytes", free_heap);
             return;
         }
         
-        // Increased stack size from 2048 to 4096 to prevent stack overflow
         BaseType_t result = xTaskCreate(
             status_led_blink_task, 
             "status_led", 
@@ -207,8 +206,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Relay GPIO: %d", CONFIG_RELAY_GPIO);
     ESP_LOGI(TAG, "Status LED GPIO: %d", CONFIG_STATUS_LED_GPIO);
     
-    ESP_LOGI(TAG, "Initial free heap size: %lu bytes", esp_get_free_heap_size());
-    ESP_LOGI(TAG, "Minimum free heap size: %lu bytes", esp_get_minimum_free_heap_size());
+    ESP_LOGI(TAG, "Initial free heap size: %zu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Minimum free heap size: %zu bytes", esp_get_minimum_free_heap_size());
     
     ESP_LOGI(TAG, "Allowing system to stabilize...");
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -222,7 +221,7 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "NVS initialized successfully");
-    ESP_LOGI(TAG, "Free heap after NVS: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after NVS: %zu bytes", esp_get_free_heap_size());
     
     // Initialize components
     ESP_LOGI(TAG, "Initializing GPIO components...");
@@ -230,7 +229,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing status LED...");
     status_led_init();
     ESP_LOGI(TAG, "Status LED initialized");
-    ESP_LOGI(TAG, "Free heap after LED init: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after LED init: %zu bytes", esp_get_free_heap_size());
     
     // Delay before creating tasks
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -238,7 +237,7 @@ void app_main(void)
     // Set initial LED state
     update_status_led(0); // Start with LED off
     ESP_LOGI(TAG, "Status LED task setup complete");
-    ESP_LOGI(TAG, "Free heap after LED task: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after LED task: %zu bytes", esp_get_free_heap_size());
     
     // Initialize relay control
     ESP_LOGI(TAG, "Initializing relay control...");
@@ -248,7 +247,7 @@ void app_main(void)
         return;
     }
     ESP_LOGI(TAG, "Relay control initialized");
-    ESP_LOGI(TAG, "Free heap after relay init: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after relay init: %zu bytes", esp_get_free_heap_size());
     
     vTaskDelay(pdMS_TO_TICKS(200));
     
@@ -260,7 +259,7 @@ void app_main(void)
         return;
     }
     ESP_LOGI(TAG, "WiFi manager initialized");
-    ESP_LOGI(TAG, "Free heap after WiFi init: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after WiFi init: %zu bytes", esp_get_free_heap_size());
     
 
     vTaskDelay(pdMS_TO_TICKS(200));
@@ -273,7 +272,7 @@ void app_main(void)
         return;
     }
     ESP_LOGI(TAG, "MQTT client initialized");
-    ESP_LOGI(TAG, "Free heap after MQTT init: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after MQTT init: %zu bytes", esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "Starting WiFi connection...");
     
@@ -292,7 +291,7 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "Heartbeat task created successfully");
     }
-    ESP_LOGI(TAG, "Free heap after heartbeat task: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after heartbeat task: %zu bytes", esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "ESP32-C6 Device Controller initialized successfully");
     ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
@@ -311,8 +310,8 @@ void app_main(void)
         
         static int loop_count = 0;
         if (loop_count % 10 == 0) {  
-            ESP_LOGI(TAG, "Free heap size: %lu bytes", esp_get_free_heap_size());
-            ESP_LOGI(TAG, "Minimum free heap: %lu bytes", esp_get_minimum_free_heap_size());
+            ESP_LOGI(TAG, "Free heap size: %zu bytes", esp_get_free_heap_size());
+            ESP_LOGI(TAG, "Minimum free heap: %zu bytes", esp_get_minimum_free_heap_size());
         }
         loop_count++;
         vTaskDelay(pdMS_TO_TICKS(10000)); 
