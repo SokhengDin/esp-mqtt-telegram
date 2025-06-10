@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import uvicorn
-import asyncio
+
 import paho.mqtt.client as mqtt
 from pathlib import Path
 from decouple import config
@@ -11,7 +11,6 @@ from typing import List, Optional, Dict, Any
 from enum import Enum
 from pydantic import BaseModel, Field
 
-# Import our configuration module
 from config import settings
 
 from contextlib import asynccontextmanager
@@ -513,6 +512,8 @@ app = FastAPI(
     , description   = "FastAPI MQTT publisher for controlling ESP32 devices"
     , version       = "1.0.0"
     , lifespan      = lifespan
+    , docs_url      = None
+    , redoc_url     = None
 )
 
 @app.get("/", tags=["Health"])
