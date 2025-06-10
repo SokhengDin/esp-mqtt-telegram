@@ -1,6 +1,6 @@
 # ESP32 Device Controller
 
-A complete IoT solution with FastAPI-based MQTT controller and ESP32 firmware for remote device control via interactive Telegram bot.
+An IoT solution with FastAPI-based MQTT controller and ESP32 firmware for remote device control via interactive Telegram bot.
 
 ## 🏗️ Architecture
 
@@ -160,13 +160,6 @@ ESP32 Board          Component
 
 ## 🤖 Interactive Telegram Bot
 
-### Enhanced Bot Features
-
-#### Smart Control Panels
-- **Interactive Buttons**: Control devices with button clicks
-- **Real-time Updates**: Live status display with timestamps
-- **Smart Responses**: Dynamic button states based on device connection
-- **Error Recovery**: Graceful handling of API errors
 
 #### Command Interface
 ```
