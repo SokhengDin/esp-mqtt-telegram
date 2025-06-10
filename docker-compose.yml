@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   esp-mqtt-telegram:
     build:
@@ -18,6 +16,8 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS}
+      
+      - APP_RELOAD=false
     networks:
       - esp-network
 
