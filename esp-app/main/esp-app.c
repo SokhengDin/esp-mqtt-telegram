@@ -52,6 +52,27 @@ static void wifi_event_callback(wifi_state_t state)
     }
 }
 
+void update_system_status_led(void)
+{
+    if (mqtt_client_get_state() == MQTT_STATE_CONNECTED) {
+
+        relay_state_t relay_state = relay_control_get_state();
+        bool relay_on = (relay_state == RELAY_STATE_ON);
+        
+        esp_err_t ret = rgb_led_set_mqtt_relay_status(true, relay_on);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to set MQTT relay status LED: %s", esp_err_to_name(ret));
+        }
+        
+        const char *color_str = relay_on ? "green (relay on)" : "yellow (relay off)";
+        ESP_LOGI(TAG, "RGB LED status: %s", color_str);
+    } else if (wifi_manager_is_connected()) {
+        update_rgb_status_led(RGB_STATUS_WIFI_CONNECTED);
+    } else {
+        update_rgb_status_led(RGB_STATUS_DISCONNECTED);
+    }
+}
+
 // Function to update RGB LED based on MQTT state
 void status_led_set_mqtt_state(mqtt_state_t state)
 {
@@ -69,8 +90,8 @@ void status_led_set_mqtt_state(mqtt_state_t state)
             break;
             
         case MQTT_STATE_CONNECTED:
-            ESP_LOGI(TAG, "MQTT: Connected - RGB LED will show solid green!");
-            update_rgb_status_led(RGB_STATUS_MQTT_CONNECTED);
+            ESP_LOGI(TAG, "MQTT: Connected - RGB LED will show relay state (green=on, yellow=off)!");
+            update_system_status_led();
             break;
             
         case MQTT_STATE_ERROR:
@@ -92,6 +113,8 @@ static void heartbeat_task(void *pvParameters)
             // Send current relay state
             relay_state_t current_state = relay_control_get_state();
             mqtt_publish_relay_state(current_state);
+            
+            update_system_status_led();
             
             const char *state_str       = (current_state == RELAY_STATE_ON) ? "on" : "off";
             ESP_LOGI(TAG, "Heartbeat sent - Status: online, Relay: %s", state_str);
@@ -237,7 +260,7 @@ void app_main(void)
     
     ESP_LOGI(TAG, "%s Device Controller initialized successfully", chip_name);
     ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
-    ESP_LOGI(TAG, "RGB LED will show system status: Blue=Connecting, Cyan=WiFi, Green=MQTT Connected");
+    ESP_LOGI(TAG, "RGB LED will show system status: Blue=Connecting, Cyan=WiFi, Green=Relay ON, Yellow=Relay OFF");
     
     if (wifi_err == ESP_OK) {
         ESP_LOGI(TAG, "Starting WiFi connection...");

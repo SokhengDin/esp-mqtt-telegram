@@ -18,6 +18,7 @@ static bool s_mqtt_initialized = false;
 
 // Function prototypes
 extern void status_led_set_mqtt_state(mqtt_state_t state);
+extern void update_system_status_led(void);
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
@@ -118,6 +119,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                         if (result == ESP_OK) {
                             const char *payload = turn_on ? "on" : "off";
                             ESP_LOGI(TAG, "Relay state changed to: %s", payload);
+                            
+                            // Update RGB LED to reflect new relay state
+                            update_system_status_led();
                             
                             // Publish confirmation with safety check
                             char state_topic[64];

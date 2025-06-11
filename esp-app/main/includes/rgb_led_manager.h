@@ -57,7 +57,9 @@ typedef enum {
     RGB_STATUS_DISCONNECTED = 0,    // System disconnected
     RGB_STATUS_CONNECTING,          // System connecting
     RGB_STATUS_WIFI_CONNECTED,      // WiFi connected
-    RGB_STATUS_MQTT_CONNECTED,      // MQTT connected
+    RGB_STATUS_MQTT_CONNECTED,      // MQTT connected (relay state unknown)
+    RGB_STATUS_MQTT_RELAY_ON,       // MQTT connected + Relay ON
+    RGB_STATUS_MQTT_RELAY_OFF,      // MQTT connected + Relay OFF
     RGB_STATUS_ERROR,               // System error
     RGB_STATUS_CUSTOM,              // Custom effect
     RGB_STATUS_MAX
@@ -133,6 +135,15 @@ esp_err_t rgb_led_stop_effect(void);
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t rgb_led_set_status(rgb_status_t status);
+
+/**
+ * @brief Set status indication based on MQTT and relay state
+ * 
+ * @param mqtt_connected Whether MQTT is connected
+ * @param relay_on Whether relay is on (true) or off (false)
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t rgb_led_set_mqtt_relay_status(bool mqtt_connected, bool relay_on);
 
 /**
  * @brief Get current effect configuration

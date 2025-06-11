@@ -196,7 +196,6 @@ esp_err_t rgb_led_stop_effect(void)
             effect_task_handle = NULL;
         }
         
-        // Clear the LED strip and ensure RMT is in good state
         if (led_strip) {
             led_strip_clear(led_strip);
         }
@@ -241,6 +240,20 @@ esp_err_t rgb_led_set_status(rgb_status_t status)
             config.brightness       = 255;
             break;
             
+        case RGB_STATUS_MQTT_RELAY_ON:
+            config.effect           = RGB_EFFECT_SOLID;
+            config.primary_color    = RGB_COLOR_GREEN;
+            config.speed_ms         = 5000;
+            config.brightness       = 255;
+            break;
+            
+        case RGB_STATUS_MQTT_RELAY_OFF:
+            config.effect           = RGB_EFFECT_SOLID;
+            config.primary_color    = RGB_COLOR_YELLOW;
+            config.speed_ms         = 5000;
+            config.brightness       = 255;
+            break;
+            
         case RGB_STATUS_ERROR:
             config.effect           = RGB_EFFECT_STROBE;
             config.primary_color    = RGB_COLOR_RED;
@@ -254,6 +267,23 @@ esp_err_t rgb_led_set_status(rgb_status_t status)
     }
     
     return rgb_led_start_effect(&config);
+}
+
+esp_err_t rgb_led_set_mqtt_relay_status(bool mqtt_connected, bool relay_on)
+{
+    rgb_status_t status;
+    
+    if (!mqtt_connected) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (relay_on) {
+        status = RGB_STATUS_MQTT_RELAY_ON;  // Green
+    } else {
+        status = RGB_STATUS_MQTT_RELAY_OFF; // Yellow
+    }
+    
+    return rgb_led_set_status(status);
 }
 
 rgb_effect_config_t* rgb_led_get_current_effect(void)
@@ -349,7 +379,7 @@ static void effect_task(void *pvParameters)
         
         switch (current_effect_config.effect) {
             case RGB_EFFECT_SOLID:
-                // For solid effect, only set once at the beginning
+                
                 if (step == 0) {
                     color = current_effect_config.primary_color;
                     apply_brightness(&color, current_effect_config.brightness);
@@ -361,7 +391,7 @@ static void effect_task(void *pvParameters)
                         ESP_LOGW(TAG, "LED strip solid set failed: %s", esp_err_to_name(ret));
                     }
                 }
-                vTaskDelay(pdMS_TO_TICKS(1000)); // Just wait - no more updates needed
+                vTaskDelay(pdMS_TO_TICKS(1000)); 
                 break;
                 
             case RGB_EFFECT_BLINK:
@@ -381,9 +411,9 @@ static void effect_task(void *pvParameters)
                 break;
                 
             case RGB_EFFECT_BREATHE: {
-                float breath = (sin(step * 0.1) + 1.0) / 2.0; // 0 to 1
-                uint8_t brightness = (uint8_t)(breath * current_effect_config.brightness);
-                color = current_effect_config.primary_color;
+                float breath        = (sin(step * 0.1) + 1.0) / 2.0; // 0 to 1
+                uint8_t brightness  = (uint8_t)(breath * current_effect_config.brightness);
+                color               = current_effect_config.primary_color;
                 apply_brightness(&color, brightness);
                 led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
                 led_strip_refresh(led_strip);
@@ -391,17 +421,17 @@ static void effect_task(void *pvParameters)
             }
             
             case RGB_EFFECT_RAINBOW: {
-                uint16_t hue = (step * 10) % 360;
-                color = rgb_led_hsv_to_rgb(hue, 100, current_effect_config.brightness);
+                uint16_t hue        = (step * 10) % 360;
+                color               = rgb_led_hsv_to_rgb(hue, 100, current_effect_config.brightness);
                 led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
                 led_strip_refresh(led_strip);
                 break;
             }
             
             case RGB_EFFECT_PULSE: {
-                float pulse = fabs(sin(step * 0.2));
-                uint8_t brightness = (uint8_t)(pulse * current_effect_config.brightness);
-                color = current_effect_config.primary_color;
+                float pulse         = fabs(sin(step * 0.2));
+                uint8_t brightness  = (uint8_t)(pulse * current_effect_config.brightness);
+                color               = current_effect_config.primary_color;
                 apply_brightness(&color, brightness);
                 led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
                 led_strip_refresh(led_strip);
@@ -409,7 +439,7 @@ static void effect_task(void *pvParameters)
             }
             
             case RGB_EFFECT_STROBE:
-                if (step % 10 < 2) { // Short flash
+                if (step % 10 < 2) { 
                     color = current_effect_config.primary_color;
                     apply_brightness(&color, current_effect_config.brightness);
                 } else {
@@ -420,14 +450,14 @@ static void effect_task(void *pvParameters)
                 break;
                 
             case RGB_EFFECT_FADE_IN_OUT: {
-                uint8_t fade_step = step % 200;
+                uint8_t fade_step   = step % 200;
                 uint8_t brightness;
                 if (fade_step < 100) {
-                    brightness = (fade_step * current_effect_config.brightness) / 100;
+                    brightness      = (fade_step * current_effect_config.brightness) / 100;
                 } else {
-                    brightness = ((200 - fade_step) * current_effect_config.brightness) / 100;
+                    brightness      = ((200 - fade_step) * current_effect_config.brightness) / 100;
                 }
-                color = current_effect_config.primary_color;
+                color   = current_effect_config.primary_color;
                 apply_brightness(&color, brightness);
                 led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
                 led_strip_refresh(led_strip);
