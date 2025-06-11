@@ -10,103 +10,16 @@
 #include "includes/wifi_manager.h"
 #include "includes/mqtt_manager.h"
 #include "includes/relay_control.h"
+#include "includes/rgb_led_manager.h"
 
 static const char *TAG = "main";
 
-// Status LED control
-static void status_led_init(void)
+// RGB LED status indication 
+static void update_rgb_status_led(rgb_status_t status)
 {
-    gpio_config_t io_conf = {
-        .intr_type      = GPIO_INTR_DISABLE,
-        .mode           = GPIO_MODE_OUTPUT,
-        .pin_bit_mask   = (1ULL << CONFIG_STATUS_LED_GPIO),
-        .pull_down_en   = 0,
-        .pull_up_en     = 0,
-    };
-    gpio_config(&io_conf);
-    gpio_set_level(CONFIG_STATUS_LED_GPIO, 0);
-    ESP_LOGI(TAG, "Status LED initialized on GPIO %d", CONFIG_STATUS_LED_GPIO);
-}
-
-static void status_led_set(bool on)
-{
-    gpio_set_level(CONFIG_STATUS_LED_GPIO, on ? 1 : 0);
-}
-
-static volatile int current_led_pattern = 0;
-static TaskHandle_t led_task_handle     = NULL;
-
-// Status LED 
-static void status_led_blink_task(void *pvParameters)
-{
-    ESP_LOGI(TAG, "Status LED task started");
-    
-    while (1) {
-        
-        int pattern     = current_led_pattern;
-        
-        switch (pattern) {
-            case 0: // Solid off - disconnected
-                status_led_set(false);
-                vTaskDelay(pdMS_TO_TICKS(1000));
-                break;
-                
-            case 1: // Slow blink - connecting
-                status_led_set(true);
-                vTaskDelay(pdMS_TO_TICKS(500));
-                status_led_set(false);
-                vTaskDelay(pdMS_TO_TICKS(500));
-                break;
-                
-            case 2: // Fast blink - WiFi connected
-                status_led_set(true);
-                vTaskDelay(pdMS_TO_TICKS(200));
-                status_led_set(false);
-                vTaskDelay(pdMS_TO_TICKS(200));
-                break;
-                
-            case 3: // Solid on - fully connected
-                status_led_set(true);
-                vTaskDelay(pdMS_TO_TICKS(1000));
-                break;
-                
-            default:
-                vTaskDelay(pdMS_TO_TICKS(100));
-                break;
-        }
-    }
-}
-
-static void update_status_led(int pattern)
-{
-    current_led_pattern = pattern;
-    
-
-    if (led_task_handle == NULL) {
-        // Check available heap
-        size_t free_heap = esp_get_free_heap_size();
-        if (free_heap < 8192) { 
-            ESP_LOGW(TAG, "Insufficient heap for LED task: %lu bytes", (unsigned long)free_heap);
-            return;
-        }
-        
-        BaseType_t result = xTaskCreate(
-            status_led_blink_task, 
-            "status_led", 
-            4096,  
-            NULL,  
-            3,     // Lower priority than critical tasks
-            &led_task_handle
-        );
-        
-        if (result != pdPASS) {
-            ESP_LOGE(TAG, "Failed to create status LED task");
-            led_task_handle = NULL;
-        } else {
-            ESP_LOGI(TAG, "Status LED task created successfully");
-            
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
+    esp_err_t ret = rgb_led_set_status(status);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to set RGB LED status: %s", esp_err_to_name(ret));
     }
 }
 
@@ -116,53 +29,53 @@ static void wifi_event_callback(wifi_state_t state)
     switch (state) {
         case WIFI_STATE_DISCONNECTED:
             ESP_LOGI(TAG, "WiFi: Disconnected");
-            update_status_led(0); // Solid off
+            update_rgb_status_led(RGB_STATUS_DISCONNECTED);
             mqtt_client_stop();
             break;
             
         case WIFI_STATE_CONNECTING:
             ESP_LOGI(TAG, "WiFi: Connecting...");
-            update_status_led(1); // Slow blink
+            update_rgb_status_led(RGB_STATUS_CONNECTING);
             break;
             
         case WIFI_STATE_CONNECTED:
             ESP_LOGI(TAG, "WiFi: Connected");
-            update_status_led(2); // Fast blink
+            update_rgb_status_led(RGB_STATUS_WIFI_CONNECTED);
             // Start MQTT client when WiFi is connected
             mqtt_client_start();
             break;
             
         case WIFI_STATE_FAILED:
             ESP_LOGI(TAG, "WiFi: Failed to connect");
-            update_status_led(0); // Solid off
+            update_rgb_status_led(RGB_STATUS_ERROR);
             break;
     }
 }
 
-// Function to update status LED based on MQTT state
+// Function to update RGB LED based on MQTT state
 void status_led_set_mqtt_state(mqtt_state_t state)
 {
     switch (state) {
         case MQTT_STATE_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT: Disconnected");
             if (wifi_manager_is_connected()) {
-                update_status_led(2); // Fast blink - WiFi connected 
+                update_rgb_status_led(RGB_STATUS_WIFI_CONNECTED);
             }
             break;
             
         case MQTT_STATE_CONNECTING:
             ESP_LOGI(TAG, "MQTT: Connecting...");
-            update_status_led(2); // Fast blink
+            update_rgb_status_led(RGB_STATUS_WIFI_CONNECTED);
             break;
             
         case MQTT_STATE_CONNECTED:
-            ESP_LOGI(TAG, "MQTT: Connected");
-            update_status_led(3); // Solid on - fully connected
+            ESP_LOGI(TAG, "MQTT: Connected - RGB LED will show solid green!");
+            update_rgb_status_led(RGB_STATUS_MQTT_CONNECTED);
             break;
             
         case MQTT_STATE_ERROR:
             ESP_LOGI(TAG, "MQTT: Connection error");
-            update_status_led(2); // Fast blink
+            update_rgb_status_led(RGB_STATUS_ERROR);
             break;
     }
 }
@@ -244,16 +157,32 @@ void app_main(void)
     
     ESP_LOGI(TAG, "Initializing GPIO components...");
     
-    ESP_LOGI(TAG, "Initializing status LED...");
-    status_led_init();
-    ESP_LOGI(TAG, "Status LED initialized");
-    ESP_LOGI(TAG, "Free heap after LED init: %lu bytes", (unsigned long)esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Initializing RGB LED Manager...");
+    esp_err_t rgb_err = rgb_led_manager_init();
+    if (rgb_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize RGB LED Manager: %s", esp_err_to_name(rgb_err));
+        ESP_LOGE(TAG, "System will continue without RGB LED functionality");
+    } else {
+        ESP_LOGI(TAG, "RGB LED Manager initialized - ESP32-C6 RGB LED ready!");
+        
+        // raing brow effect
+        rgb_effect_config_t startup_effect = {
+            .effect     = RGB_EFFECT_RAINBOW,
+            .speed_ms   = 100,
+            .brightness = 200,
+            .repeat     = false
+        };
+        rgb_led_start_effect(&startup_effect);
+        vTaskDelay(pdMS_TO_TICKS(3000)); 
+        rgb_led_stop_effect();
+    }
+    ESP_LOGI(TAG, "Free heap after RGB LED init: %lu bytes", (unsigned long)esp_get_free_heap_size());
     
     vTaskDelay(pdMS_TO_TICKS(100));
     
-    update_status_led(0);
-    ESP_LOGI(TAG, "Status LED task setup complete");
-    ESP_LOGI(TAG, "Free heap after LED task: %lu bytes", (unsigned long)esp_get_free_heap_size());
+    update_rgb_status_led(RGB_STATUS_DISCONNECTED);
+    ESP_LOGI(TAG, "RGB LED status setup complete");
+    ESP_LOGI(TAG, "Free heap after RGB LED setup: %lu bytes", (unsigned long)esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "Initializing relay control...");
     esp_err_t relay_err = relay_control_init();
@@ -308,6 +237,7 @@ void app_main(void)
     
     ESP_LOGI(TAG, "%s Device Controller initialized successfully", chip_name);
     ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
+    ESP_LOGI(TAG, "RGB LED will show system status: Blue=Connecting, Cyan=WiFi, Green=MQTT Connected");
     
     if (wifi_err == ESP_OK) {
         ESP_LOGI(TAG, "Starting WiFi connection...");

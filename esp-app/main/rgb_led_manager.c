@@ -195,39 +195,39 @@ esp_err_t rgb_led_set_status(rgb_status_t status)
     
     switch (status) {
         case RGB_STATUS_DISCONNECTED:
-            config.effect = RGB_EFFECT_SOLID;
-            config.primary_color = RGB_COLOR_OFF;
-            config.brightness = 0;
+            config.effect           = RGB_EFFECT_SOLID;
+            config.primary_color    = RGB_COLOR_OFF;
+            config.brightness       = 0;
             break;
             
         case RGB_STATUS_CONNECTING:
-            config.effect = RGB_EFFECT_BREATHE;
-            config.primary_color = RGB_COLOR_BLUE;
-            config.speed_ms = 1000;
-            config.brightness = 128;
-            config.repeat = true;
+            config.effect           = RGB_EFFECT_BREATHE;
+            config.primary_color    = RGB_COLOR_BLUE;
+            config.speed_ms         = 1000;
+            config.brightness       = 128;
+            config.repeat           = true;
             break;
             
         case RGB_STATUS_WIFI_CONNECTED:
-            config.effect = RGB_EFFECT_BLINK;
-            config.primary_color = RGB_COLOR_CYAN;
-            config.speed_ms = 500;
-            config.brightness = 200;
-            config.repeat = true;
+            config.effect           = RGB_EFFECT_BLINK;
+            config.primary_color    = RGB_COLOR_CYAN;
+            config.speed_ms         = 500;
+            config.brightness       = 200;
+            config.repeat           = true;
             break;
             
         case RGB_STATUS_MQTT_CONNECTED:
-            config.effect = RGB_EFFECT_SOLID;
-            config.primary_color = RGB_COLOR_GREEN;
-            config.brightness = 255;
+            config.effect           = RGB_EFFECT_SOLID;
+            config.primary_color    = RGB_COLOR_GREEN;
+            config.brightness       = 255;
             break;
             
         case RGB_STATUS_ERROR:
-            config.effect = RGB_EFFECT_STROBE;
-            config.primary_color = RGB_COLOR_RED;
-            config.speed_ms = 200;
-            config.brightness = 255;
-            config.repeat = true;
+            config.effect           = RGB_EFFECT_STROBE;
+            config.primary_color    = RGB_COLOR_RED;
+            config.speed_ms         = 200;
+            config.brightness       = 255;
+            config.repeat           = true;
             break;
             
         default:
