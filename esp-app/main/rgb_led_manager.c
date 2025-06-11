@@ -182,8 +182,25 @@ esp_err_t rgb_led_stop_effect(void)
 {
     if (effect_task_handle) {
         effect_running = false;
-        vTaskDelete(effect_task_handle);
-        effect_task_handle = NULL;
+        
+        // Wait for task to finish naturally
+        int retry_count = 0;
+        while (effect_task_handle != NULL && retry_count < 50) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            retry_count++;
+        }
+        
+        // Force delete if still running
+        if (effect_task_handle != NULL) {
+            vTaskDelete(effect_task_handle);
+            effect_task_handle = NULL;
+        }
+        
+        // Clear the LED strip and ensure RMT is in good state
+        if (led_strip) {
+            led_strip_clear(led_strip);
+        }
+        
         ESP_LOGI(TAG, "Effect stopped");
     }
     return ESP_OK;
@@ -220,7 +237,7 @@ esp_err_t rgb_led_set_status(rgb_status_t status)
         case RGB_STATUS_MQTT_CONNECTED:
             config.effect           = RGB_EFFECT_SOLID;
             config.primary_color    = RGB_COLOR_GREEN;
-            config.speed_ms         = 1000;
+            config.speed_ms         = 5000;  // Update less frequently for solid colors
             config.brightness       = 255;
             break;
             
@@ -326,16 +343,25 @@ static void effect_task(void *pvParameters)
     
     ESP_LOGI(TAG, "Effect task started: %d", current_effect_config.effect);
     
-    while (effect_running) {
+    while (effect_running && led_strip) {
         rgb_color_t color = {0};
+        esp_err_t ret = ESP_OK;
         
         switch (current_effect_config.effect) {
             case RGB_EFFECT_SOLID:
-                color = current_effect_config.primary_color;
-                apply_brightness(&color, current_effect_config.brightness);
-                led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
-                led_strip_refresh(led_strip);
-                vTaskDelay(pdMS_TO_TICKS(1000)); // Just wait
+                // For solid effect, only set once at the beginning
+                if (step == 0) {
+                    color = current_effect_config.primary_color;
+                    apply_brightness(&color, current_effect_config.brightness);
+                    ret = led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
+                    if (ret == ESP_OK) {
+                        ret = led_strip_refresh(led_strip);
+                    }
+                    if (ret != ESP_OK) {
+                        ESP_LOGW(TAG, "LED strip solid set failed: %s", esp_err_to_name(ret));
+                    }
+                }
+                vTaskDelay(pdMS_TO_TICKS(1000)); // Just wait - no more updates needed
                 break;
                 
             case RGB_EFFECT_BLINK:
@@ -345,8 +371,13 @@ static void effect_task(void *pvParameters)
                     color = RGB_COLOR_OFF;
                 }
                 apply_brightness(&color, current_effect_config.brightness);
-                led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
-                led_strip_refresh(led_strip);
+                ret = led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
+                if (ret == ESP_OK) {
+                    ret = led_strip_refresh(led_strip);
+                }
+                if (ret != ESP_OK) {
+                    ESP_LOGW(TAG, "LED strip blink failed: %s", esp_err_to_name(ret));
+                }
                 break;
                 
             case RGB_EFFECT_BREATHE: {
