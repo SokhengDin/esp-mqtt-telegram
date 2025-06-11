@@ -86,7 +86,7 @@ static void update_status_led(int pattern)
         // Check available heap
         size_t free_heap = esp_get_free_heap_size();
         if (free_heap < 8192) { 
-            ESP_LOGW(TAG, "Insufficient heap for LED task: %lu bytes", free_heap);
+            ESP_LOGW(TAG, "Insufficient heap for LED task: %zu bytes", free_heap);
             return;
         }
         
@@ -225,8 +225,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Relay GPIO: %d", CONFIG_RELAY_GPIO);
     ESP_LOGI(TAG, "Status LED GPIO: %d", CONFIG_STATUS_LED_GPIO);
     
-    ESP_LOGI(TAG, "Initial free heap size: %lu bytes", esp_get_free_heap_size());
-    ESP_LOGI(TAG, "Minimum free heap size: %lu bytes", esp_get_minimum_free_heap_size());
+    ESP_LOGI(TAG, "Initial free heap size: %zu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Minimum free heap size: %zu bytes", esp_get_minimum_free_heap_size());
     
     ESP_LOGI(TAG, "Allowing system to stabilize...");
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -240,20 +240,20 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "NVS initialized successfully");
-    ESP_LOGI(TAG, "Free heap after NVS: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after NVS: %zu bytes", esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "Initializing GPIO components...");
     
     ESP_LOGI(TAG, "Initializing status LED...");
     status_led_init();
     ESP_LOGI(TAG, "Status LED initialized");
-    ESP_LOGI(TAG, "Free heap after LED init: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after LED init: %zu bytes", esp_get_free_heap_size());
     
     vTaskDelay(pdMS_TO_TICKS(100));
     
     update_status_led(0);
     ESP_LOGI(TAG, "Status LED task setup complete");
-    ESP_LOGI(TAG, "Free heap after LED task: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after LED task: %zu bytes", esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "Initializing relay control...");
     esp_err_t relay_err = relay_control_init();
@@ -263,7 +263,7 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "Relay control initialized");
     }
-    ESP_LOGI(TAG, "Free heap after relay init: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after relay init: %zu bytes", esp_get_free_heap_size());
     
     vTaskDelay(pdMS_TO_TICKS(200));
     
@@ -275,7 +275,7 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "WiFi manager initialized");
     }
-    ESP_LOGI(TAG, "Free heap after WiFi init: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after WiFi init: %zu bytes", esp_get_free_heap_size());
 
     vTaskDelay(pdMS_TO_TICKS(200));
     
@@ -287,7 +287,7 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "MQTT client initialized");
     }
-    ESP_LOGI(TAG, "Free heap after MQTT init: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after MQTT init: %zu bytes", esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "Creating heartbeat task...");
     BaseType_t heartbeat_result = xTaskCreate(
@@ -304,7 +304,7 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "Heartbeat task created successfully");
     }
-    ESP_LOGI(TAG, "Free heap after heartbeat task: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap after heartbeat task: %zu bytes", esp_get_free_heap_size());
     
     ESP_LOGI(TAG, "%s Device Controller initialized successfully", chip_name);
     ESP_LOGI(TAG, "Ready to receive MQTT commands on topic: %s/relay/set", CONFIG_DEVICE_ID);
@@ -333,8 +333,8 @@ void app_main(void)
     while (1) {
         static int loop_count = 0;
         if (loop_count % 10 == 0) {  
-            ESP_LOGI(TAG, "Free heap size: %lu bytes", esp_get_free_heap_size());
-            ESP_LOGI(TAG, "Minimum free heap: %lu bytes", esp_get_minimum_free_heap_size());
+            ESP_LOGI(TAG, "Free heap size: %zu bytes", esp_get_free_heap_size());
+            ESP_LOGI(TAG, "Minimum free heap: %zu bytes", esp_get_minimum_free_heap_size());
             ESP_LOGI(TAG, "WiFi state: %d, MQTT state: %d", 
                     wifi_manager_get_state(), 
                     mqtt_client_get_state());
