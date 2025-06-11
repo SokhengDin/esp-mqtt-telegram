@@ -406,7 +406,7 @@ static void effect_task(void *pvParameters)
                 uint8_t red = 255;
                 uint8_t green   = esp_random() % 100 + 50; // 50-150
                 uint8_t blue    = esp_random() % 20; // 0-20
-                color.red        red;
+                color.red       = red;
                 color.green     = green;
                 color.blue      = blue;
                 apply_brightness(&color, current_effect_config.brightness);
