@@ -197,6 +197,7 @@ esp_err_t rgb_led_set_status(rgb_status_t status)
         case RGB_STATUS_DISCONNECTED:
             config.effect           = RGB_EFFECT_SOLID;
             config.primary_color    = RGB_COLOR_OFF;
+            config.speed_ms         = 1000;
             config.brightness       = 0;
             break;
             
@@ -219,6 +220,7 @@ esp_err_t rgb_led_set_status(rgb_status_t status)
         case RGB_STATUS_MQTT_CONNECTED:
             config.effect           = RGB_EFFECT_SOLID;
             config.primary_color    = RGB_COLOR_GREEN;
+            config.speed_ms         = 1000;
             config.brightness       = 255;
             break;
             
@@ -440,7 +442,12 @@ static void effect_task(void *pvParameters)
             break;
         }
         
-        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(current_effect_config.speed_ms / 10));
+        // Ensure minimum delay to prevent assertion failure
+        uint32_t delay_ms = current_effect_config.speed_ms / 10;
+        if (delay_ms == 0) {
+            delay_ms = 1; // Minimum 1ms delay
+        }
+        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(delay_ms));
     }
     
     // Turn off
