@@ -34,12 +34,12 @@ esp_err_t mqtt_client_stop(void);
 /**
  * @brief Publish message to MQTT topic
  * @param topic MQTT topic
- * @param payload Message payload
+ * @param data Message data
  * @param qos Quality of service (0, 1, or 2)
  * @param retain Retain flag
  * @return ESP_OK on success, ESP_FAIL on failure
  */
-esp_err_t mqtt_client_publish(const char *topic, const char *payload, int qos, int retain);
+esp_err_t mqtt_publish_message(const char *topic, const char *data, int qos, int retain);
 
 /**
  * @brief Subscribe to MQTT topic

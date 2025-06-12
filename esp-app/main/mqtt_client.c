@@ -15,6 +15,8 @@ static const char *TAG = "MQTT_CLIENT";
 static esp_mqtt_client_handle_t s_mqtt_client = NULL;
 static mqtt_state_t s_mqtt_state = MQTT_STATE_DISCONNECTED;
 static bool s_mqtt_initialized = false;
+static int s_connection_retry_count = 0;
+static const int MAX_CONNECTION_RETRIES = 5;
 
 // Function prototypes
 extern void status_led_set_mqtt_state(mqtt_state_t state);
@@ -36,7 +38,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     switch ((esp_mqtt_event_id_t)event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            s_mqtt_state = MQTT_STATE_CONNECTED;
+            s_mqtt_state                = MQTT_STATE_CONNECTED;
+            s_connection_retry_count    = 0;  // Reset retry counter on successful connection
             status_led_set_mqtt_state(s_mqtt_state);
             
             // Subscribe to relay control topic with safety check
@@ -63,9 +66,14 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             break;
 
         case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+            s_connection_retry_count++;
+            ESP_LOGW(TAG, "MQTT_EVENT_DISCONNECTED (retry %d/%d)", s_connection_retry_count, MAX_CONNECTION_RETRIES);
             s_mqtt_state = MQTT_STATE_DISCONNECTED;
             status_led_set_mqtt_state(s_mqtt_state);
+            
+            if (s_connection_retry_count >= MAX_CONNECTION_RETRIES) {
+                ESP_LOGW(TAG, "Max MQTT connection retries reached, will continue trying with longer delays");
+            }
             break;
 
         case MQTT_EVENT_SUBSCRIBED:
@@ -171,16 +179,18 @@ esp_err_t mqtt_client_init(void)
     
     ESP_LOGI(TAG, "Initializing MQTT client");
     
-    // Prepare Last Will and Testament topic
     char lwt_topic[64];
     snprintf(lwt_topic, sizeof(lwt_topic), "%s/status", CONFIG_DEVICE_ID);
+
+    char client_id[64];
+    snprintf(client_id, sizeof(client_id), "%s_%08X", CONFIG_DEVICE_ID, (unsigned int)esp_random());
     
-    esp_mqtt_client_config_t mqtt_cfg = {0}; 
+    esp_mqtt_client_config_t mqtt_cfg   = {0}; 
     
     // Basic broker configuration
-    mqtt_cfg.broker.address.uri = CONFIG_MQTT_BROKER_URI;
+    mqtt_cfg.broker.address.uri         = CONFIG_MQTT_BROKER_URI;
+    mqtt_cfg.credentials.client_id      = client_id;
     
-    // Credentials (only set if not empty)
     if (strlen(CONFIG_MQTT_USERNAME) > 0) {
         mqtt_cfg.credentials.username = CONFIG_MQTT_USERNAME;
     }
@@ -189,23 +199,24 @@ esp_err_t mqtt_client_init(void)
     }
     
     // Last Will and Testament
-    mqtt_cfg.session.last_will.topic = lwt_topic;
-    mqtt_cfg.session.last_will.msg = "offline";
-    mqtt_cfg.session.last_will.msg_len = 7;
-    mqtt_cfg.session.last_will.qos = 1;
-    mqtt_cfg.session.last_will.retain = 1;
+    mqtt_cfg.session.last_will.topic    = lwt_topic;
+    mqtt_cfg.session.last_will.msg      = "offline";
+    mqtt_cfg.session.last_will.msg_len  = 7;
+    mqtt_cfg.session.last_will.qos      = 1;
+    mqtt_cfg.session.last_will.retain   = 1;
     
-    // Network settings
+    // Network mqtt network 
     mqtt_cfg.network.disable_auto_reconnect = false;
-    mqtt_cfg.network.timeout_ms = 10000;
-    mqtt_cfg.network.refresh_connection_after_ms = 20000;
+    mqtt_cfg.network.timeout_ms             = 30000;                    // Increased to 30s for better stability
+    mqtt_cfg.network.refresh_connection_after_ms    = 0;
+    mqtt_cfg.network.reconnect_timeout_ms           = 10000;            // 10s reconnect delay
     
     // Buffer settings
-    mqtt_cfg.buffer.size = 1024;
-    mqtt_cfg.buffer.out_size = 1024;
+    mqtt_cfg.buffer.size        = 1024;
+    mqtt_cfg.buffer.out_size    = 1024;
     
-    // Session settings
-    mqtt_cfg.session.keepalive = 120;
+    // Session settings 
+    mqtt_cfg.session.keepalive = 60;                       // Reduced from 120s to 60s for faster detection
     mqtt_cfg.session.disable_clean_session = false;
 
     s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
@@ -224,6 +235,10 @@ esp_err_t mqtt_client_init(void)
 
     s_mqtt_initialized = true;
     ESP_LOGI(TAG, "MQTT client initialized successfully");
+    ESP_LOGI(TAG, "Client ID: %s", client_id);
+    ESP_LOGI(TAG, "Keepalive: %d seconds, Timeout: %d ms", 
+             mqtt_cfg.session.keepalive, mqtt_cfg.network.timeout_ms);
+    ESP_LOGI(TAG, "Auto-reconnect: enabled, Forced refresh: disabled");
     return ESP_OK;
 }
 

@@ -103,10 +103,19 @@ esp_err_t rgb_led_manager_deinit(void)
 esp_err_t rgb_led_set_color(rgb_color_t color)
 {
     if (!led_strip) {
+        ESP_LOGW(TAG, "LED strip not initialized");
         return ESP_ERR_INVALID_STATE;
     }
     
-    xSemaphoreTake(effect_mutex, portMAX_DELAY);
+    if (!effect_mutex) {
+        ESP_LOGE(TAG, "Effect mutex not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (xSemaphoreTake(effect_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+        ESP_LOGW(TAG, "Failed to take effect mutex within timeout");
+        return ESP_ERR_TIMEOUT;
+    }
     
     apply_brightness(&color, global_brightness);
     esp_err_t ret = led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
@@ -121,10 +130,19 @@ esp_err_t rgb_led_set_color(rgb_color_t color)
 esp_err_t rgb_led_set_color_brightness(rgb_color_t color, uint8_t brightness)
 {
     if (!led_strip) {
+        ESP_LOGW(TAG, "LED strip not initialized");
         return ESP_ERR_INVALID_STATE;
     }
     
-    xSemaphoreTake(effect_mutex, portMAX_DELAY);
+    if (!effect_mutex) {
+        ESP_LOGE(TAG, "Effect mutex not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (xSemaphoreTake(effect_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+        ESP_LOGW(TAG, "Failed to take effect mutex within timeout");
+        return ESP_ERR_TIMEOUT;
+    }
     
     apply_brightness(&color, brightness);
     esp_err_t ret = led_strip_set_pixel(led_strip, 0, color.red, color.green, color.blue);
@@ -143,14 +161,33 @@ esp_err_t rgb_led_off(void)
 
 esp_err_t rgb_led_start_effect(rgb_effect_config_t *config)
 {
-    if (!config || !led_strip) {
+    if (!config) {
+        ESP_LOGE(TAG, "Effect config is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (!led_strip) {
+        ESP_LOGW(TAG, "LED strip not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (!effect_mutex) {
+        ESP_LOGE(TAG, "Effect mutex not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (config->effect >= RGB_EFFECT_MAX) {
+        ESP_LOGE(TAG, "Invalid effect type: %d", config->effect);
         return ESP_ERR_INVALID_ARG;
     }
     
     // Stop current effect
     rgb_led_stop_effect();
     
-    xSemaphoreTake(effect_mutex, portMAX_DELAY);
+    if (xSemaphoreTake(effect_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+        ESP_LOGW(TAG, "Failed to take effect mutex within timeout");
+        return ESP_ERR_TIMEOUT;
+    }
     
     // Copy configuration
     current_effect_config = *config;

@@ -10,7 +10,11 @@ extern "C" {
 #endif
 
 // RGB LED Configuration
-#define RGB_LED_GPIO                8
+#ifndef CONFIG_STATUS_LED_GPIO
+#define RGB_LED_GPIO                8  // Default fallback
+#else
+#define RGB_LED_GPIO                CONFIG_STATUS_LED_GPIO
+#endif
 #define RGB_LED_COUNT              1
 #define RGB_LED_RMT_RES_HZ         (10 * 1000 * 1000) // 10MHz resolution
 

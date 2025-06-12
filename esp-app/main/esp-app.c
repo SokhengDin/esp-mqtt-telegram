@@ -4,6 +4,7 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
 
@@ -118,6 +119,11 @@ static void heartbeat_task(void *pvParameters)
             
             const char *state_str       = (current_state == RELAY_STATE_ON) ? "on" : "off";
             ESP_LOGI(TAG, "Heartbeat sent - Status: online, Relay: %s", state_str);
+        }
+        
+        // Check heap integrity every heartbeat
+        if (!heap_caps_check_integrity_all(true)) {
+            ESP_LOGE(TAG, "Heap corruption detected!");
         }
         
         // Send heartbeat every 30 seconds
