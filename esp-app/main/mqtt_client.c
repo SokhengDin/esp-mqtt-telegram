@@ -4,6 +4,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include "esp_system.h"
+#include "esp_random.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "mqtt_client.h"
