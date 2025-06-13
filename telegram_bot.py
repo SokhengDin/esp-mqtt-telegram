@@ -11,7 +11,7 @@ from managers import ConfigManager
 from mqtt_client import MQTTClient
 from logger import get_logger
 
-logger = get_logger('telegram')
+logger  = get_logger('telegram')
 
 class TelegramBot:
     def __init__(self, config_manager: ConfigManager, mqtt_client: MQTTClient):
@@ -25,12 +25,18 @@ class TelegramBot:
             logger.warning("TELEGRAM_BOT_TOKEN not found in environment variables")
     
     def _get_device_display_name(self, device_id: str) -> str:
-        """Get generic display name for device (Device 1, Device 2, etc.)"""
-        devices = list(self.config_manager.devices_db.keys())
+    
+        devices     = list(self.config_manager.devices_db.keys())
         if device_id in devices:
-            index = devices.index(device_id) + 1
+            index   = devices.index(device_id) + 1
             return f"Device {index}"
         return f"Device {device_id}"
+    
+    def _get_actual_power_state(self, relay_state: RelayState) -> str:
+        return "ON" if relay_state == RelayState.off else "OFF"
+    
+    def _get_power_emoji(self, relay_state: RelayState) -> str:
+        return "🔌" if relay_state == RelayState.off else "⚫"
     
     def _is_authorized(self, user_id: int) -> bool:
         """Check if user is authorized to use the bot"""
@@ -100,15 +106,15 @@ Welcome! I can help you control your ESP32 devices with an interactive interface
 
 Available commands:
 • `/get_devices` - List all devices
-• `/status <device_id>` - Check device status
-• `/control <device_id>` - Open interactive control panel
+• `/status <device_id>` - Check device power status
+• `/control <device_id>` - Open interactive power control panel
 • `/help` - Show detailed help
 
 Example:
 `/status esp-device-1`
 `/control esp-device-1`
 
-The control command opens an interactive panel with buttons for easy device control!
+The control command opens an interactive panel with buttons for easy power control!
         """
         
         await update.effective_message.reply_text(welcome_message, parse_mode="Markdown")
@@ -132,7 +138,7 @@ The control command opens an interactive panel with buttons for easy device cont
    Lists all available ESP32 devices
 
 📊 `/status <device_id>`
-   Shows connection status and relay state
+   Shows connection status and power state
    Example: `/status esp-device-1`
 
 🎛️ `/control <device_id>`
@@ -141,7 +147,7 @@ The control command opens an interactive panel with buttons for easy device cont
    
    *Interactive Features:*
    • Real-time device status display
-   • ON/OFF buttons for relay control
+   • ON/OFF buttons for power control
    • Refresh button to update status
    • Close button to exit control panel
 
@@ -175,13 +181,14 @@ The control command opens an interactive panel with buttons for easy device cont
             message = "📱 *ESP32 Devices:*\n\n"
             
             for device in devices:
-                status_emoji = "🟢" if device.status == DeviceStatus.connected else "🔴"
-                relay_emoji = "🔌" if device.relay_state == RelayState.on else "⚫"
+                status_emoji        = "🟢" if device.status == DeviceStatus.connected else "🔴"
+                power_emoji         = self._get_power_emoji(device.relay_state)
+                actual_power_state  = self._get_actual_power_state(device.relay_state)
                 device_display_name = self._get_device_display_name(device.device)
                 
                 message += f"{status_emoji} *{device_display_name}*\n"
                 message += f"   Status: {device.status.value}\n"
-                message += f"   Relay: {relay_emoji} {device.relay_state.value}\n"
+                message += f"   Power: {power_emoji} {actual_power_state}\n"
                 message += f"   ID: `{device.device}`\n\n"
             
             await update.effective_message.reply_text(message, parse_mode="Markdown")
@@ -219,15 +226,16 @@ The control command opens an interactive panel with buttons for easy device cont
                 await update.effective_message.reply_text(f"❌ Device `{device_id}` not found.")
                 return
             
-            status_emoji = "🟢" if device.status == DeviceStatus.connected.value else "🔴"
-            relay_emoji = "🔌" if device.relay_state == RelayState.on.value else "⚫"
+            status_emoji        = "🟢" if device.status == DeviceStatus.connected else "🔴"
+            power_emoji         = self._get_power_emoji(device.relay_state)
+            actual_power_state  = self._get_actual_power_state(device.relay_state)
             device_display_name = self._get_device_display_name(device.device)
             
             message = f"""
 📊 *Device Status: {device_display_name}*
 
 {status_emoji} **Connection:** {device.status.value}
-{relay_emoji} **Relay State:** {device.relay_state.value}
+{power_emoji} **Power State:** {actual_power_state}
 🏷️ **Device ID:** `{device.device}`
             """
             
@@ -290,9 +298,10 @@ The control command opens an interactive panel with buttons for easy device cont
                 await message.reply_text(f"❌ Device `{device_id}` not found.")
                 return
             
-            status_emoji    = "🟢" if device.status == DeviceStatus.connected else "🔴"
-            relay_emoji     = "🔌" if device.relay_state == RelayState.on else "⚫"
-            mqtt_emoji      = "📡" if device.status == DeviceStatus.connected else "📵"
+            status_emoji        = "🟢" if device.status == DeviceStatus.connected else "🔴"
+            power_emoji         = self._get_power_emoji(device.relay_state)
+            actual_power_state  = self._get_actual_power_state(device.relay_state)
+            mqtt_emoji          = "📡" if device.status == DeviceStatus.connected else "📵"
             device_display_name = self._get_device_display_name(device.device)
             
             status_message = f"""
@@ -300,17 +309,18 @@ The control command opens an interactive panel with buttons for easy device cont
 
 📱 **Device:** {device_display_name}
 {mqtt_emoji} **MQTT Status:** {device.status.value}
-{relay_emoji} **Relay State:** {device.relay_state.value}
+{power_emoji} **Power State:** {actual_power_state}
 
-Use the buttons below to control the relay:
+Use the buttons below to control the power:
             """
             
             keyboard = []
             
             if device.status == DeviceStatus.connected:
+
                 keyboard.append([
-                    InlineKeyboardButton("🔌 Turn ON", callback_data=f"relay_on_{device_id}"),
-                    InlineKeyboardButton("⚫ Turn OFF", callback_data=f"relay_off_{device_id}")
+                    InlineKeyboardButton("🔌 Turn ON", callback_data=f"power_on_{device_id}"),
+                    InlineKeyboardButton("⚫ Turn OFF", callback_data=f"power_off_{device_id}")
                 ])
             else:
                 keyboard.append([
@@ -326,8 +336,8 @@ Use the buttons below to control the relay:
             
             await message.reply_text(
                 status_message,
-                parse_mode="Markdown",
-                reply_markup=reply_markup
+                parse_mode      ="Markdown",
+                reply_markup    =reply_markup
             )
             
         except Exception as e:
@@ -347,34 +357,36 @@ Use the buttons below to control the relay:
         await query.answer()  
         
         try:
-            callback_data = query.data
+            callback_data   = query.data
             logger.info(f"User {username} ({user_id}) pressed button: {callback_data}")
             
             if callback_data == "device_disconnected":
-                await query.answer("❌ Device is disconnected. Cannot control relay.", show_alert=True)
+                await query.answer("❌ Device is disconnected. Cannot control power.", show_alert=True)
                 return
             
-            if callback_data.startswith("relay_on_"):
-                device_id = callback_data.replace("relay_on_", "")
-                await self._handle_relay_control(query, device_id, RelayState.on)
+            if callback_data.startswith("power_on_"):
+                device_id   = callback_data.replace("power_on_", "")
                 
-            elif callback_data.startswith("relay_off_"):
-                device_id = callback_data.replace("relay_off_", "")
-                await self._handle_relay_control(query, device_id, RelayState.off)
+                await self._handle_power_control(query, device_id, "ON", RelayState.off)
+                
+            elif callback_data.startswith("power_off_"):
+                device_id   = callback_data.replace("power_off_", "")
+                
+                await self._handle_power_control(query, device_id, "OFF", RelayState.on)
                 
             elif callback_data.startswith("refresh_"):
-                device_id = callback_data.replace("refresh_", "")
+                device_id   = callback_data.replace("refresh_", "")
                 await self._handle_refresh(query, device_id)
                 
             elif callback_data.startswith("close_"):
-                device_id = callback_data.replace("close_", "")
+                device_id   = callback_data.replace("close_", "")
                 await self._handle_close(query, device_id)
                 
         except Exception as e:
             logger.error(f"Error in button_callback: {e}")
             await query.edit_message_text(f"❌ Error processing button press: {str(e)}")
     
-    async def _handle_relay_control(self, query, device_id: str, relay_state: RelayState):
+    async def _handle_power_control(self, query, device_id: str, power_action: str, relay_state: RelayState):
         try:
             device = self.config_manager.get_device(device_id)
             
@@ -383,27 +395,26 @@ Use the buttons below to control the relay:
                 return
             
             if device.status == DeviceStatus.disconnected:
-                await query.answer("❌ Device is disconnected. Cannot control relay.", show_alert=True)
+                await query.answer("❌ Device is disconnected. Cannot control power.", show_alert=True)
                 return
             
             # Send MQTT command and update local state immediately
             self.mqtt_client.publish_relay_control(device_id, relay_state)
             
-            # Force update the control panel with action message to ensure content changes
-            action_emoji = "🔌" if relay_state == RelayState.on else "⚫"
+            action_emoji = "🔌" if power_action == "ON" else "⚫"
             await self._update_control_panel(
                 query, 
                 device_id, 
-                f"✅ {action_emoji} Relay command sent: {relay_state.value.upper()}"
+                f"✅ {action_emoji} Power command sent: {power_action}"
             )
             
         except Exception as e:
-            logger.error(f"Error controlling relay: {e}")
+            logger.error(f"Error controlling power: {e}")
             try:
-                await query.edit_message_text(f"❌ Failed to control relay: {str(e)}")
+                await query.edit_message_text(f"❌ Failed to control power: {str(e)}")
             except Exception as edit_error:
                 logger.error(f"Failed to edit message with error: {edit_error}")
-                await query.answer(f"❌ Failed to control relay: {str(e)}", show_alert=True)
+                await query.answer(f"❌ Failed to control power: {str(e)}", show_alert=True)
     
     async def _handle_refresh(self, query, device_id: str):
         try:
@@ -439,9 +450,10 @@ Use the buttons below to control the relay:
                 await query.edit_message_text(f"❌ Device `{device_id}` not found.")
                 return
             
-            status_emoji    = "🟢" if device.status == DeviceStatus.connected else "🔴"
-            relay_emoji     = "🔌" if device.relay_state == RelayState.on else "⚫"
-            mqtt_emoji      = "📡" if device.status == DeviceStatus.connected else "📵"
+            status_emoji        = "🟢" if device.status == DeviceStatus.connected else "🔴"
+            power_emoji         = self._get_power_emoji(device.relay_state)
+            actual_power_state  = self._get_actual_power_state(device.relay_state)
+            mqtt_emoji          = "📡" if device.status == DeviceStatus.connected else "📵"
             device_display_name = self._get_device_display_name(device.device)
             
             status_message = f"""
@@ -449,20 +461,21 @@ Use the buttons below to control the relay:
 
 📱 **Device:** {device_display_name}
 {mqtt_emoji} **MQTT Status:** {device.status.value}
-{relay_emoji} **Relay State:** {device.relay_state.value}
+{power_emoji} **Power State:** {actual_power_state}
 """
             
             if action_message:
                 status_message += f"\n{action_message}\n"
             
-            status_message += "\nUse the buttons below to control the relay:"
+            status_message += "\nUse the buttons below to control the power:"
             
-            keyboard = []
+            keyboard        = []
             
             if device.status == DeviceStatus.connected:
+                
                 keyboard.append([
-                    InlineKeyboardButton("🔌 Turn ON", callback_data=f"relay_on_{device_id}"),
-                    InlineKeyboardButton("⚫ Turn OFF", callback_data=f"relay_off_{device_id}")
+                    InlineKeyboardButton("🔌 Turn ON", callback_data=f"power_on_{device_id}"),
+                    InlineKeyboardButton("⚫ Turn OFF", callback_data=f"power_off_{device_id}")
                 ])
             else:
                 keyboard.append([
@@ -486,7 +499,7 @@ Use the buttons below to control the relay:
             error_msg = str(e)
             if "Message is not modified" in error_msg:
                 logger.info(f"Control panel content unchanged for {device_id}, skipping update")
-                # Optionally show a brief notification without changing the message
+                
                 await query.answer("Status unchanged", show_alert=False)
             else:
                 logger.error(f"Error updating control panel: {e}")

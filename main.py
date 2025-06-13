@@ -11,7 +11,6 @@ from mqtt_client import MQTTClient
 from telegram_bot import TelegramBot
 from logger import setup_logging, get_logger, log_startup_info, log_shutdown_info
 
-# Setup centralized logging
 setup_logging()
 logger = get_logger('main')
 
@@ -88,15 +87,15 @@ async def get_device(
 
 @app.post("/devices/{device_id}/control", tags=["Control"])
 async def control_device_relay(
-    device_id: str
-    , control: DeviceControl
-    , config: ConfigManager = Depends(get_config_manager)
-    , mqtt: MQTTClient = Depends(get_mqtt_client)
+    device_id   : str
+    , control   : DeviceControl
+    , config    : ConfigManager = Depends(get_config_manager)
+    , mqtt      : MQTTClient    = Depends(get_mqtt_client)
 ):
-    api_logger = get_logger('api')
+    api_logger  = get_logger('api')
     api_logger.info(f"Controlling device {device_id} - setting relay to {control.relay_state}")
     
-    device = config.get_device(device_id)
+    device      = config.get_device(device_id)
     if not device:
         api_logger.warning(f"Device not found: {device_id}")
         raise HTTPException(status_code=404, detail="Device not found")
