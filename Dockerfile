@@ -23,10 +23,6 @@ RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
 
 COPY . .
 
-RUN chown -R appuser:appuser /app
-
-USER appuser
-
 EXPOSE 8000
 
 CMD ["python", "main.py"]
