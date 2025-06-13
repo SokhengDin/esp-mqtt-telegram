@@ -17,7 +17,7 @@ services:
       - CONFIG_FILE=${CONFIG_FILE:-esp_config.json}
       - APP_RELOAD=false
     volumes:
-      - ./logs/app/logs
+      - ./logs:/app/logs
       - ./esp_config.json:/app/esp_config.json
     networks:
       - esp-network
