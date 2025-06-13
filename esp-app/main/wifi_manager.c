@@ -38,6 +38,14 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "WiFi started, connecting...");
+        
+        esp_err_t tx_power_ret = esp_wifi_set_max_tx_power(34); 
+        if (tx_power_ret == ESP_OK) {
+            ESP_LOGI(TAG, "WiFi TX power reduced to 8.5dBm");
+        } else {
+            ESP_LOGW(TAG, "Failed to set WiFi TX power: %s", esp_err_to_name(tx_power_ret));
+        }
+        
         wifi_state_changed(WIFI_STATE_CONNECTING);
         vTaskDelay(pdMS_TO_TICKS(100)); // Add delay before connecting to reduce power spike
         esp_wifi_connect();
@@ -124,7 +132,6 @@ esp_err_t wifi_manager_init(wifi_event_callback_t callback)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MIN_MODEM));
-    ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(34));
 
     s_wifi_initialized = true;
     ESP_LOGI(TAG, "WiFi manager initialized");
