@@ -40,7 +40,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
             s_mqtt_state                = MQTT_STATE_CONNECTED;
-            s_connection_retry_count    = 0;  // Reset retry counter on successful connection
+            s_connection_retry_count    = 0; 
             status_led_set_mqtt_state(s_mqtt_state);
             
             // Subscribe to relay control topic with safety check

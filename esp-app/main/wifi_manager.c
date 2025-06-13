@@ -39,10 +39,12 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "WiFi started, connecting...");
         wifi_state_changed(WIFI_STATE_CONNECTING);
+        vTaskDelay(pdMS_TO_TICKS(100)); // Add delay before connecting to reduce power spike
         esp_wifi_connect();
 
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         if (s_retry_num < CONFIG_ESP_MAXIMUM_RETRY) {
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Wait longer between retries to reduce power spikes
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "Retry to connect to the AP (%d/%d)", s_retry_num, CONFIG_ESP_MAXIMUM_RETRY);
@@ -120,6 +122,9 @@ esp_err_t wifi_manager_init(wifi_event_callback_t callback)
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MIN_MODEM));
+    ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(34));
 
     s_wifi_initialized = true;
     ESP_LOGI(TAG, "WiFi manager initialized");

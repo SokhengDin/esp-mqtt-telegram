@@ -12,6 +12,7 @@
 #include "includes/mqtt_manager.h"
 #include "includes/relay_control.h"
 #include "includes/rgb_led_manager.h"
+#include "esp_pm.h"
 
 static const char *TAG = "main";
 
@@ -171,7 +172,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Minimum free heap size: %lu bytes", (unsigned long)esp_get_minimum_free_heap_size());
     
     ESP_LOGI(TAG, "Allowing system to stabilize...");
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Longer stabilization time
     
     ESP_LOGI(TAG, "Initializing NVS...");
     esp_err_t ret = nvs_flash_init();
@@ -184,6 +185,19 @@ void app_main(void)
     ESP_LOGI(TAG, "NVS initialized successfully");
     ESP_LOGI(TAG, "Free heap after NVS: %lu bytes", (unsigned long)esp_get_free_heap_size());
     
+    ESP_LOGI(TAG, "Configuring power management...");
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = 80,  // Reduced from 160MHz to lower power consumption
+        .min_freq_mhz = 10,  
+        .light_sleep_enable = false 
+    };
+    esp_err_t pm_ret = esp_pm_configure(&pm_config);
+    if (pm_ret == ESP_OK) {
+        ESP_LOGI(TAG, "Power management configured: Max 80MHz, Min 10MHz");
+    } else {
+        ESP_LOGW(TAG, "Power management configuration failed: %s", esp_err_to_name(pm_ret));
+    }
+    
     ESP_LOGI(TAG, "Initializing GPIO components...");
     
     ESP_LOGI(TAG, "Initializing RGB LED Manager...");
@@ -194,20 +208,22 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "RGB LED Manager initialized - ESP32-C6 RGB LED ready!");
         
-        // raing brow effect
+
         rgb_effect_config_t startup_effect = {
             .effect     = RGB_EFFECT_RAINBOW,
-            .speed_ms   = 100,
-            .brightness = 200,
+            .speed_ms   = 300, 
+            .brightness = 30,  
             .repeat     = false
         };
         rgb_led_start_effect(&startup_effect);
-        vTaskDelay(pdMS_TO_TICKS(3000)); 
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Shorter duration
         rgb_led_stop_effect();
+        
+        rgb_led_set_status(RGB_STATUS_DISCONNECTED);
     }
     ESP_LOGI(TAG, "Free heap after RGB LED init: %lu bytes", (unsigned long)esp_get_free_heap_size());
     
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(500));
     
     update_rgb_status_led(RGB_STATUS_DISCONNECTED);
     ESP_LOGI(TAG, "RGB LED status setup complete");
@@ -235,7 +251,7 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Free heap after WiFi init: %lu bytes", (unsigned long)esp_get_free_heap_size());
 
-    vTaskDelay(pdMS_TO_TICKS(200));
+    vTaskDelay(pdMS_TO_TICKS(500)); // Longer delay before WiFi start to prevent power spike
     
     ESP_LOGI(TAG, "Initializing MQTT client...");
     esp_err_t mqtt_err = mqtt_client_init();
@@ -270,6 +286,7 @@ void app_main(void)
     
     if (wifi_err == ESP_OK) {
         ESP_LOGI(TAG, "Starting WiFi connection...");
+        vTaskDelay(pdMS_TO_TICKS(1000)); 
         esp_err_t wifi_start_err    = wifi_manager_start();
         if (wifi_start_err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(wifi_start_err));

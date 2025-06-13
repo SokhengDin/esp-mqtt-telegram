@@ -17,7 +17,7 @@ static TaskHandle_t effect_task_handle = NULL;
 static SemaphoreHandle_t effect_mutex   = NULL;
 static volatile bool effect_running     = false;
 static rgb_effect_config_t current_effect_config = {0};
-static uint8_t global_brightness        = 255;
+static uint8_t global_brightness        = 128; // Reduced default brightness to prevent power spikes
 
 // Predefined Colors
 const rgb_color_t RGB_COLOR_OFF     = {0, 0, 0};
@@ -258,7 +258,7 @@ esp_err_t rgb_led_set_status(rgb_status_t status)
             config.effect           = RGB_EFFECT_BREATHE;
             config.primary_color    = RGB_COLOR_BLUE;
             config.speed_ms         = 1000;
-            config.brightness       = 128;
+            config.brightness       = 80;  // Reduced brightness
             config.repeat           = true;
             break;
             
@@ -266,7 +266,7 @@ esp_err_t rgb_led_set_status(rgb_status_t status)
             config.effect           = RGB_EFFECT_BLINK;
             config.primary_color    = RGB_COLOR_CYAN;
             config.speed_ms         = 500;
-            config.brightness       = 200;
+            config.brightness       = 120; // Reduced brightness
             config.repeat           = true;
             break;
             
