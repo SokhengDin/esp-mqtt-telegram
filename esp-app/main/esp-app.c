@@ -187,7 +187,7 @@ void app_main(void)
     
     ESP_LOGI(TAG, "Configuring power management...");
     esp_pm_config_t pm_config = {
-        .max_freq_mhz = 80,  // Reduced from 160MHz to lower power consumption
+        .max_freq_mhz = 80, 
         .min_freq_mhz = 10,  
         .light_sleep_enable = false 
     };
@@ -195,7 +195,8 @@ void app_main(void)
     if (pm_ret == ESP_OK) {
         ESP_LOGI(TAG, "Power management configured: Max 80MHz, Min 10MHz");
     } else {
-        ESP_LOGW(TAG, "Power management configuration failed: %s", esp_err_to_name(pm_ret));
+        ESP_LOGW(TAG, "Power management not available on this build: %s", esp_err_to_name(pm_ret));
+        ESP_LOGI(TAG, "Continuing without dynamic frequency scaling");
     }
     
     ESP_LOGI(TAG, "Initializing GPIO components...");
@@ -208,22 +209,23 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "RGB LED Manager initialized - ESP32-C6 RGB LED ready!");
         
-
         rgb_effect_config_t startup_effect = {
-            .effect     = RGB_EFFECT_RAINBOW,
-            .speed_ms   = 300, 
-            .brightness = 30,  
+            .effect     = RGB_EFFECT_SOLID, 
+            .primary_color = RGB_COLOR_BLUE,
+            .speed_ms   = 100, 
+            .brightness = 20,  
             .repeat     = false
         };
         rgb_led_start_effect(&startup_effect);
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Shorter duration
+        vTaskDelay(pdMS_TO_TICKS(500)); 
         rgb_led_stop_effect();
         
         rgb_led_set_status(RGB_STATUS_DISCONNECTED);
     }
     ESP_LOGI(TAG, "Free heap after RGB LED init: %lu bytes", (unsigned long)esp_get_free_heap_size());
     
-    vTaskDelay(pdMS_TO_TICKS(500));
+    // Longer delay to allow power to stabilize after RGB LED
+    vTaskDelay(pdMS_TO_TICKS(1000));
     
     update_rgb_status_led(RGB_STATUS_DISCONNECTED);
     ESP_LOGI(TAG, "RGB LED status setup complete");
@@ -239,9 +241,47 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Free heap after relay init: %lu bytes", (unsigned long)esp_get_free_heap_size());
     
-    vTaskDelay(pdMS_TO_TICKS(200));
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+
+    ESP_LOGI(TAG, "Turning off RGB LED to minimize power during WiFi initialization...");
+    rgb_led_off();
+    
+    vTaskDelay(pdMS_TO_TICKS(2000)); 
+    
+    ESP_LOGI(TAG, "Reducing CPU frequency to minimize power consumption during WiFi init...");
+    esp_pm_config_t low_power_config = {
+        .max_freq_mhz = 40,  
+        .min_freq_mhz = 10,  
+        .light_sleep_enable = false 
+    };
+    esp_err_t low_pm_ret = esp_pm_configure(&low_power_config);
+    if (low_pm_ret == ESP_OK) {
+        ESP_LOGI(TAG, "CPU frequency reduced to 40MHz for WiFi initialization");
+    } else {
+        ESP_LOGI(TAG, "Using extended delays for power management instead");
+        vTaskDelay(pdMS_TO_TICKS(3000)); 
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
     
     ESP_LOGI(TAG, "Initializing WiFi manager...");
+
+    nvs_handle_t phy_handle;
+    esp_err_t nvs_ret = nvs_open("phy", NVS_READWRITE, &phy_handle);
+    if (nvs_ret == ESP_OK) {
+        nvs_close(phy_handle);
+        ESP_LOGI(TAG, "PHY calibration NVS namespace ready");
+    } else {
+        ESP_LOGW(TAG, "PHY calibration NVS not available: %s", esp_err_to_name(nvs_ret));
+        // Try to create the namespace
+        nvs_ret = nvs_open("phy", NVS_READWRITE, &phy_handle);
+        if (nvs_ret == ESP_OK) {
+            nvs_close(phy_handle);
+            ESP_LOGI(TAG, "PHY calibration NVS namespace created");
+        }
+    }
+    
     esp_err_t wifi_err = wifi_manager_init(wifi_event_callback);
     if (wifi_err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize WiFi manager: %s", esp_err_to_name(wifi_err));
@@ -251,7 +291,9 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Free heap after WiFi init: %lu bytes", (unsigned long)esp_get_free_heap_size());
 
-    vTaskDelay(pdMS_TO_TICKS(500)); // Longer delay before WiFi start to prevent power spike
+
+    ESP_LOGI(TAG, "WiFi initialized - waiting before starting connection...");
+    vTaskDelay(pdMS_TO_TICKS(3000)); 
     
     ESP_LOGI(TAG, "Initializing MQTT client...");
     esp_err_t mqtt_err = mqtt_client_init();
@@ -285,14 +327,38 @@ void app_main(void)
     ESP_LOGI(TAG, "RGB LED will show system status: Blue=Connecting, Cyan=WiFi, Green=Relay ON, Yellow=Relay OFF");
     
     if (wifi_err == ESP_OK) {
-        ESP_LOGI(TAG, "Starting WiFi connection...");
-        vTaskDelay(pdMS_TO_TICKS(1000)); 
-        esp_err_t wifi_start_err    = wifi_manager_start();
+        ESP_LOGI(TAG, "Starting WiFi connection with power management...");
+        
+        ESP_LOGI(TAG, "Final power stabilization before WiFi start...");
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        
+        ESP_LOGI(TAG, "Starting WiFi at reduced CPU frequency...");
+        esp_err_t wifi_start_err = wifi_manager_start();
         if (wifi_start_err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(wifi_start_err));
         } else {
+            ESP_LOGI(TAG, "WiFi started successfully at low power");
+            
+            vTaskDelay(pdMS_TO_TICKS(3000));
+            
+            ESP_LOGI(TAG, "Restoring normal CPU frequency...");
+            esp_pm_config_t normal_config = {
+                .max_freq_mhz = 80,
+                .min_freq_mhz = 10,  
+                .light_sleep_enable = false 
+            };
+            esp_err_t restore_pm_ret = esp_pm_configure(&normal_config);
+            if (restore_pm_ret == ESP_OK) {
+                ESP_LOGI(TAG, "CPU frequency restored to 80MHz");
+            } else {
+                ESP_LOGI(TAG, "Power management not available - continuing with default frequency");
+            }
+            
+            ESP_LOGI(TAG, "Restoring RGB LED status...");
+            update_rgb_status_led(RGB_STATUS_CONNECTING);
+            
             ESP_LOGI(TAG, "WiFi connection started, waiting for result...");
-            esp_err_t wait_result   = wifi_manager_wait_for_connection(30000);
+            esp_err_t wait_result = wifi_manager_wait_for_connection(30000);
             if (wait_result == ESP_OK) {
                 ESP_LOGI(TAG, "WiFi connected successfully");
             } else if (wait_result == ESP_ERR_TIMEOUT) {

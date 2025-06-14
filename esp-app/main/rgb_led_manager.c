@@ -257,23 +257,23 @@ esp_err_t rgb_led_set_status(rgb_status_t status)
         case RGB_STATUS_CONNECTING:
             config.effect           = RGB_EFFECT_BREATHE;
             config.primary_color    = RGB_COLOR_BLUE;
-            config.speed_ms         = 1000;
-            config.brightness       = 80;  // Reduced brightness
+            config.speed_ms         = 1500;  
+            config.brightness       = 40;    
             config.repeat           = true;
             break;
             
         case RGB_STATUS_WIFI_CONNECTED:
             config.effect           = RGB_EFFECT_BLINK;
             config.primary_color    = RGB_COLOR_CYAN;
-            config.speed_ms         = 500;
-            config.brightness       = 120; // Reduced brightness
+            config.speed_ms         = 800;   
+            config.brightness       = 60;    
             config.repeat           = true;
             break;
             
         case RGB_STATUS_MQTT_CONNECTED:
             config.effect           = RGB_EFFECT_SOLID;
             config.primary_color    = RGB_COLOR_GREEN;
-            config.speed_ms         = 5000;  // Update less frequently for solid colors
+            config.speed_ms         = 5000;  
             config.brightness       = 255;
             break;
             

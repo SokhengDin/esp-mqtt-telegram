@@ -4,5 +4,5 @@ idf_component_register(SRCS "esp-app.c"
                            "relay_control.c"
                            "rgb_led_manager.c"
                     INCLUDE_DIRS "." "includes"
-                    REQUIRES esp_wifi esp_netif nvs_flash led_strip
+                    REQUIRES esp_wifi esp_netif nvs_flash led_strip esp_pm esp_timer
                     PRIV_REQUIRES mqtt esp_driver_gpio)
