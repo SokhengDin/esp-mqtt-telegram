@@ -41,6 +41,11 @@ class Settings:
     # Device Configuration
     CONFIG_FILE_PATH        : str = config("CONFIG_FILE_PATH", default="esp_config.json")
     
+    # Device Timeout Configuration
+    DEVICE_HEARTBEAT_TIMEOUT_SECONDS : int = config("DEVICE_HEARTBEAT_TIMEOUT_SECONDS", default=90, cast=int)
+    DEVICE_STATUS_TIMEOUT_SECONDS    : int = config("DEVICE_STATUS_TIMEOUT_SECONDS", default=120, cast=int)
+    DEVICE_MONITOR_INTERVAL_SECONDS  : int = config("DEVICE_MONITOR_INTERVAL_SECONDS", default=30, cast=int)
+    
     @classmethod
     def get_telegram_allowed_users(cls) -> List[int]:
         """

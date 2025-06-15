@@ -206,18 +206,15 @@ esp_err_t mqtt_client_init(void)
     mqtt_cfg.session.last_will.qos      = 1;
     mqtt_cfg.session.last_will.retain   = 1;
     
-    // Network mqtt network 
     mqtt_cfg.network.disable_auto_reconnect = false;
-    mqtt_cfg.network.timeout_ms             = 30000;                    // Increased to 30s for better stability
+    mqtt_cfg.network.timeout_ms             = 15000;                    // Reduced to 15s for faster timeout detection
     mqtt_cfg.network.refresh_connection_after_ms    = 0;
-    mqtt_cfg.network.reconnect_timeout_ms           = 10000;            // 10s reconnect delay
+    mqtt_cfg.network.reconnect_timeout_ms           = 5000;             // Reduced to 5s for faster reconnection
     
-    // Buffer settings
     mqtt_cfg.buffer.size        = 1024;
     mqtt_cfg.buffer.out_size    = 1024;
-    
-    // Session settings 
-    mqtt_cfg.session.keepalive = 60;                       // Reduced from 120s to 60s for faster detection
+
+    mqtt_cfg.session.keepalive = 30;                     
     mqtt_cfg.session.disable_clean_session = false;
 
     s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);

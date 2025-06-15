@@ -108,26 +108,41 @@ static void heartbeat_task(void *pvParameters)
     ESP_LOGI(TAG, "Heartbeat task started");
     
     while (1) {
-        if (mqtt_client_get_state() == MQTT_STATE_CONNECTED) {
-            // Send heartbeat status
-            mqtt_publish_status();
-            
-            // Send current relay state
+        mqtt_state_t mqtt_state         = mqtt_client_get_state();
+        
+        if (mqtt_state == MQTT_STATE_CONNECTED) {
+            esp_err_t status_result     = mqtt_publish_status();
+        
             relay_state_t current_state = relay_control_get_state();
-            mqtt_publish_relay_state(current_state);
+            esp_err_t relay_result      = mqtt_publish_relay_state(current_state);
             
             update_system_status_led();
             
-            const char *state_str       = (current_state == RELAY_STATE_ON) ? "on" : "off";
-            ESP_LOGI(TAG, "Heartbeat sent - Status: online, Relay: %s", state_str);
+            const char *state_str = (current_state == RELAY_STATE_ON) ? "on" : "off";
+            
+            if (status_result == ESP_OK && relay_result == ESP_OK) {
+                ESP_LOGI(TAG, "Heartbeat sent successfully - Status: online, Relay: %s", state_str);
+            } else {
+                ESP_LOGW(TAG, "Heartbeat send failed - Status result: %s, Relay result: %s", 
+                         esp_err_to_name(status_result), esp_err_to_name(relay_result));
+            }
+        } else {
+            ESP_LOGW(TAG, "Heartbeat skipped - MQTT not connected (state: %d)", mqtt_state);
+            
+            
+            if (mqtt_state      == MQTT_STATE_ERROR || mqtt_state == MQTT_STATE_DISCONNECTED) {
+                ESP_LOGI(TAG, "Attempting MQTT reconnection...");
+                esp_err_t start_result = mqtt_client_start();
+                if (start_result != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to restart MQTT client: %s", esp_err_to_name(start_result));
+                }
+            }
         }
         
-        // Check heap integrity every heartbeat
         if (!heap_caps_check_integrity_all(true)) {
             ESP_LOGE(TAG, "Heap corruption detected!");
         }
         
-        // Send heartbeat every 30 seconds
         vTaskDelay(pdMS_TO_TICKS(30000));
     }
 }

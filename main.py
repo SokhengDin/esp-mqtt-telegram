@@ -1,4 +1,5 @@
 import uvicorn
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import HTTPException, status, Depends, Request, Response, FastAPI
@@ -18,6 +19,9 @@ config_manager  = ConfigManager()
 mqtt_client     = MQTTClient(config_manager=config_manager)
 telegram_bot    = TelegramBot(config_manager=config_manager, mqtt_client=mqtt_client)
 
+# Background task control
+background_task_running = False
+
 def get_config_manager() -> ConfigManager:
     return config_manager
 
@@ -27,8 +31,38 @@ def get_mqtt_client() -> MQTTClient:
 def get_telegram_bot() -> TelegramBot:
     return telegram_bot
 
+async def device_timeout_monitor():
+    """Background task to monitor device timeouts and update status"""
+    global background_task_running
+    monitor_logger              = get_logger('device_monitor')
+    monitor_logger.info("Device timeout monitor started")
+    
+    while background_task_running:
+        try:
+            timeout_updates     = config_manager.check_device_timeouts()
+            
+            if timeout_updates:
+                monitor_logger.info(f"Timeout monitor: Updated {len(timeout_updates)} devices")
+                for device_id, new_status in timeout_updates.items():
+                    monitor_logger.warning(f"Device {device_id} marked as {new_status.value} due to timeout")
+                
+                    if telegram_bot.application and telegram_bot.allowed_users:
+                        try:
+                            message = f"⚠️ Device {device_id} has been marked as {new_status.value} due to timeout"
+                            for chat_id in telegram_bot.allowed_users:
+                                await telegram_bot.application.bot.send_message(chat_id=chat_id, text=message)
+                        except Exception as e:
+                            monitor_logger.error(f"Failed to send timeout notification: {e}")
+            
+            await asyncio.sleep(settings.DEVICE_MONITOR_INTERVAL_SECONDS)
+            
+        except Exception as e:
+            monitor_logger.error(f"Error in device timeout monitor: {e}")
+            await asyncio.sleep(60) 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global background_task_running
     log_startup_info()
 
     try:
@@ -43,9 +77,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start Telegram bot: {e}")
     
+    background_task_running = True
+    monitor_task            = asyncio.create_task(device_timeout_monitor())
+    logger.info("Device timeout monitor started")
+    
     yield
 
     log_shutdown_info()
+    background_task_running = False
+    
+    if not monitor_task.done():
+        monitor_task.cancel()
+        try:
+            await monitor_task
+        except asyncio.CancelledError:
+            logger.info("Device timeout monitor stopped")
+    
     await mqtt_client.disconnect()
     await telegram_bot.stop()
 
@@ -72,8 +119,8 @@ async def get_devices(config: ConfigManager = Depends(get_config_manager)):
 
 @app.get("/devices/{device_id}", response_model=Device, tags=["Devices"])
 async def get_device(
-    device_id: str
-    , config: ConfigManager = Depends(get_config_manager)
+    device_id   : str
+    , config    : ConfigManager = Depends(get_config_manager)
 ):
     api_logger = get_logger('api')
     api_logger.info(f"Getting device: {device_id}")
@@ -84,6 +131,67 @@ async def get_device(
         raise HTTPException(status_code=404, detail="Device not found")
     
     return device
+
+@app.get("/devices/{device_id}/connection", tags=["Devices", "Diagnostics"])
+async def get_device_connection_info(
+    device_id: str
+    , config: ConfigManager = Depends(get_config_manager)
+):
+    """Get detailed connection information for a device including timestamps and timeout status"""
+    api_logger      = get_logger('api')
+    api_logger.info(f"Getting connection info for device: {device_id}")
+    
+    connection_info = config.get_device_connection_info(device_id)
+    if "error" in connection_info:
+        api_logger.warning(f"Device not found: {device_id}")
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    return connection_info
+
+@app.get("/devices/status/{status}", tags=["Devices"])
+async def get_devices_by_status(
+    status: DeviceStatus
+    , config: ConfigManager = Depends(get_config_manager)
+):
+    """Get all devices with a specific status"""
+    api_logger = get_logger('api')
+    api_logger.info(f"Getting devices with status: {status.value}")
+    
+    devices = config.get_devices_by_status(status)
+    return {
+        "status": status.value,
+        "count": len(devices),
+        "devices": list(devices.values())
+    }
+
+@app.get("/devices/diagnostics/stale", tags=["Devices", "Diagnostics"])
+async def get_stale_devices(
+    threshold_seconds: int = None
+    , config: ConfigManager = Depends(get_config_manager)
+):
+    """Get devices that haven't been seen within the threshold (default: heartbeat timeout)"""
+    api_logger = get_logger('api')
+    api_logger.info(f"Getting stale devices with threshold: {threshold_seconds}")
+    
+    stale_devices = config.get_stale_devices(threshold_seconds)
+    return {
+        "threshold_seconds": threshold_seconds or config.heartbeat_timeout_seconds,
+        "stale_count": len(stale_devices),
+        "devices": list(stale_devices.values())
+    }
+
+@app.post("/devices/diagnostics/check-timeouts", tags=["Devices", "Diagnostics"])
+async def manual_timeout_check(config: ConfigManager = Depends(get_config_manager)):
+    """Manually trigger a device timeout check"""
+    api_logger = get_logger('api')
+    api_logger.info("Manual timeout check requested")
+    
+    timeout_updates = config.check_device_timeouts()
+    return {
+        "message": "Timeout check completed",
+        "updated_devices": len(timeout_updates),
+        "updates": timeout_updates
+    }
 
 @app.post("/devices/{device_id}/control", tags=["Control"])
 async def control_device_relay(

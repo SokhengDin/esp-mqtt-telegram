@@ -100,21 +100,35 @@ class MQTTClient:
             logger.error(f"MQTT: Error processing message - {e}")
 
     def _handle_status_message(self, topic: str, payload: str):
-        """Handle device status messages"""
+        """Handle device status messages with improved LWT and heartbeat detection"""
         device_id = topic.replace("/status", "")
         
         if device_id in self.config_manager.devices_db:
-            # Determine device status from payload
+
             if payload.lower() in ["online", "connected", "1", "true"]:
-                new_status = DeviceStatus.connected
+                new_status      = DeviceStatus.connected
+                is_heartbeat    = True 
+            elif payload.lower() in ["offline", "disconnected", "0", "false"]:
+                new_status      = DeviceStatus.disconnected
+                is_heartbeat    = False 
             else:
-                new_status = DeviceStatus.disconnected
-            
-            # Update device status
-            current_status = self.config_manager.devices_db[device_id].status
+                logger.warning(f"MQTT: Unknown status payload '{payload}' for device {device_id}")
+                return
+        
+            current_status      = self.config_manager.devices_db[device_id].status
             if current_status != new_status:
-                self.config_manager.update_device_status(device_id, new_status)
+                self.config_manager.update_device_status(device_id, new_status, update_heartbeat=is_heartbeat)
                 logger.info(f"MQTT: Device {device_id} status changed: {current_status.value} → {new_status.value}")
+                
+                if new_status == DeviceStatus.disconnected:
+                    if is_heartbeat:
+                        logger.info(f"MQTT: Device {device_id} sent explicit disconnect")
+                    else:
+                        logger.warning(f"MQTT: Device {device_id} disconnected via LWT (Last Will and Testament)")
+            else:
+                if new_status == DeviceStatus.connected and is_heartbeat:
+                    self.config_manager.update_device_status(device_id, new_status, update_heartbeat=True)
+                    logger.debug(f"MQTT: Heartbeat received from {device_id}")
         else:
             logger.warning(f"MQTT: Received status for unknown device: {device_id}")
 
@@ -133,6 +147,10 @@ class MQTTClient:
             if current_state != new_state:
                 self.config_manager.update_device_relay(device_id, new_state)
                 logger.info(f"MQTT: Device {device_id} relay state changed: {current_state.value} → {new_state.value}")
+            else:
+    
+                self.config_manager.update_device_relay(device_id, new_state)
+                logger.debug(f"MQTT: Relay state confirmation from {device_id}: {new_state.value}")
         else:
             logger.warning(f"MQTT: Received relay state for unknown device: {device_id}")
 
